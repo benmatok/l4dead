@@ -1,0 +1,50 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    // NOTICE: Task assumes docker image has been already built. If building from Dockerfile fails - catkin_make manually.
+    "version": "2.0.0",
+    "tasks": [
+        // {
+        //     "label": "build",
+        //     "command": ["docker"],
+        //     "args": ["build","-t","l4dead:latest","."],
+        //     "type": "shell",
+        // },
+        {
+            "label": "xhost-plus",
+            "command":["xhost"],
+            "args":["+"],
+            "type":"shell",
+            // "dependsOn":["build"]
+        },
+        {
+            "label": "start",
+            "command": ["docker"],
+            "args": ["run", "-dit","--name","l4d","--expose","5678","--rm","--mount","type=bind,source=$PWD/data,target=/app",
+            "--env='DISPLAY'","--env='QT_X11_NO_MITSHM=1'","--volume='/tmp/.X11-unix:/tmp/.X11-unix:rw'","--privileged","l4dead:latest"],
+            "type": "shell",
+            "dependsOn": ["xhost-plus"]
+        },
+        {
+            "label": "run-roscore",
+            "command": ["docker"],
+            "args": ["exec", "-itd","l4d","bash","-c","\"source /opt/ros/noetic/setup.bash && roscore\""],
+            "type": "shell",
+            "dependsOn": ["start"]
+        },
+        {
+            "label": "run-rosbag",
+            "command": ["docker"],
+            "args": ["exec", "-itd","l4d","bash","-c","\"source /opt/ros/noetic/setup.bash && rosbag play /app/*.bag\""],
+            "type": "shell",
+            "dependsOn": ["run-roscore"]
+        },
+        {
+            "label": "run-r3live",
+            "command": ["docker"],
+            "args": ["exec","-it","l4d","bash","-c","\"source /opt/ros/noetic/setup.bash && source /catkin_ws/devel/setup.bash && roslaunch r3live r3live_bag.launch\""],
+            "type": "shell",
+            "dependsOn": ["run-rosbag"]
+        },
+    ]
+}
