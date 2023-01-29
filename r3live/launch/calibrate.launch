@@ -1,0 +1,5 @@
+<launch>
+    <!-- Subscribed topics -->
+    <node pkg="r3live" type="calibrate" name="calibrate" output="screen" required="true" />
+
+</launch>

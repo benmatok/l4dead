@@ -32,8 +32,61 @@ RUN cmake .. && make && make install
 RUN mkdir -p /catkin_ws/src/r3live
 COPY . /catkin_ws/src/r3live
 RUN git clone https://github.com/Livox-SDK/livox_ros_driver.git /catkin_ws/src/livox_ros_driver
+
+
+
+#install realsense-viewer
+RUN apt-get update && apt-get upgrade -y
+RUN sudo apt-get install -y software-properties-common
+RUN sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key F6E65AC044F831AC80A06380C8B3A55A6F3EFCDE || sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-key F6E65AC044F831AC80A06380C8B3A55A6F3EFCDE
+RUN  sudo add-apt-repository "deb https://librealsense.intel.com/Debian/apt-repo $(lsb_release -cs) main" -u
+RUN  sudo apt-get install -y librealsense2-dkms
+RUN  sudo apt-get install -y librealsense2-utils
+RUN  sudo apt-get install -y librealsense2-dev
+RUN  sudo apt-get install -y librealsense2-dbg
+
+
+
+RUN sudo apt-get install -y ros-noetic-ddynamic-reconfigure
+
+
+
+
+
+RUN git clone https://github.com/IntelRealSense/realsense-ros.git /catkin_ws/src/realsense_ros
+
+
+
+WORKDIR /catkin_ws/src/realsense_ros
+RUN git checkout `git tag | sort -V | grep -P "^2.\d+\.\d+" | tail -1`
+
+
 WORKDIR /catkin_ws
-RUN . /opt/ros/noetic/setup.sh && catkin_make
+
+
+
+
+#RUN . /opt/ros/noetic/setup.sh &&  catkin_make clean
+#RUN . /opt/ros/noetic/setup.sh &&  catkin_make  #-DCATKIN_ENABLE_TESTING=False -DCMAKE_BUILD_TYPE=Release
+#RUN . /opt/ros/noetic/setup.sh &&  catkin_make install
+RUN apt-get update && apt-get upgrade -y
+#RUN . /opt/ros/noetic/setup.sh && catkin_make
+
+
+
+
+
+
+RUN sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys EB3E94ADBE1229CF
+RUN sudo add-apt-repository -y "deb [arch=amd64] https://packages.microsoft.com/repos/vscode stable main"
+RUN sudo apt -y install code
+
+
+RUN echo "source /catkin_ws/devel/setup.bash" >> /root/bashrc
+
+
+
+
 
 WORKDIR /
 # SHELL ["/bin/bash", "-c"]

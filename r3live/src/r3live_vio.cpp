@@ -57,6 +57,20 @@ double                                      g_lio_frame_cost_time = 0;
 int                                         g_flag_if_first_rec_img = 1;
 #define DEBUG_PHOTOMETRIC 0
 #define USING_CERES 0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 void dump_lio_state_to_log( FILE *fp )
 {
     if ( fp != nullptr && g_camera_lidar_queue.m_if_dump_log )

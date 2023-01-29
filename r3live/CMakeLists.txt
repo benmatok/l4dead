@@ -162,4 +162,22 @@ target_link_libraries(r3live_meshing
                                   pcl_io
                                   pcl_kdtree)
 
+
+
+
+add_executable(calibrate src/calibrate.cpp src/calibrate_camera.cpp)
+target_link_libraries(calibrate
+                          ${catkin_LIBRARIES}
+                          ${Boost_LIBRARIES}
+                          ${Boost_FILESYSTEM_LIBRARY}
+                          ${Boost_SERIALIZATION_LIBRARY} # serialization
+                          ${OpenCV_LIBRARIES}
+                          # ${OpenMVS_LIBRARIES}
+                          pcl_common 
+                          pcl_io) 
+
+
+
+
+
 endif()
