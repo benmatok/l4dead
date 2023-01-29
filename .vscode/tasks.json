@@ -1,20 +1,21 @@
 {
     // See https://go.microsoft.com/fwlink/?LinkId=733558
     // for the documentation about the tasks.json format
+    // NOTICE: Task assumes docker image has been already built. If building from Dockerfile fails - catkin_make manually.
     "version": "2.0.0",
     "tasks": [
-        {
-            "label": "build",
-            "command": ["docker"],
-            "args": ["build","-t","l4dead:latest","."],
-            "type": "shell",
-        },
+        // {
+        //     "label": "build",
+        //     "command": ["docker"],
+        //     "args": ["build","-t","l4dead:latest","."],
+        //     "type": "shell",
+        // },
         {
             "label": "xhost-plus",
             "command":["xhost"],
             "args":["+"],
             "type":"shell",
-            "dependsOn":["build"]
+            // "dependsOn":["build"]
         },
         {
             "label": "start",
@@ -28,7 +29,6 @@
             "label": "run-roscore",
             "command": ["docker"],
             "args": ["exec", "-itd","l4d","bash","-c","\"source /opt/ros/noetic/setup.bash && roscore\""],
-            // "args": ["exec", "-d","l4d","sh -c \"roscore &\""],
             "type": "shell",
             "dependsOn": ["start"]
         },
