@@ -9,8 +9,29 @@
 
 
 
-
 void  Calibrate::img_cbk(const sensor_msgs::ImageConstPtr &msg)
+{
+
+    cv::Mat image = cv_bridge::toCvCopy( msg, sensor_msgs::image_encodings::BGR8 )->image.clone();
+    cv::Vec3d  rvec ;
+    cv::Vec3d tvec ; 
+
+    Calibrate::detectCharucoBoardWithCalibrationPose(image ,  rvec ,  tvec ) ; 
+    cv::imshow(" image1",image);
+    cv::waitKey(1);
+    if (rvec[0] != 0 || rvec[1] !=0 || rvec[2]!=0  || tvec[0] != 0 ||  tvec[1] !=0 || tvec[2] !=0)
+    { 
+    std::cout << "translation_camera:" <<  tvec << std::endl;
+    std::cout << "rotation_camera:" <<  rvec << std::endl;
+    }
+
+
+
+
+}
+
+
+void  Calibrate::img_cbk_calibrate(const sensor_msgs::ImageConstPtr &msg)
 {
 
     cv::Mat img = cv_bridge::toCvCopy( msg, sensor_msgs::image_encodings::BGR8 )->image.clone();
@@ -58,6 +79,7 @@ void Calibrate::detectCharucoBoardWithoutCalibration(cv::Mat image ,  std::vecto
     image.copyTo(imageCopy);
     std::vector<int> markerIds;
     std::vector<std::vector<cv::Point2f> > markerCorners;
+    
     cv::aruco::detectMarkers(image, dict, markerCorners, markerIds, params);
         //or
         //cv::aruco::detectMarkers(image, dictionary, markerCorners, markerIds, params);
@@ -108,36 +130,35 @@ std::cout << cameraMatrix << std::endl ;
 
 
 }
-void  Calibrate::detectCharucoBoardWithCalibrationPose(cv::Mat &image )
+
+
+void  Calibrate::detectCharucoBoardWithCalibrationPose(cv::Mat &image  ,cv::Vec3d &rvec , cv::Vec3d &tvec )
 {
-    cv::VideoCapture inputVideo;
-    inputVideo.open(0);
-    cv::Mat cameraMatrix, distCoeffs;
-    std::string filename = "calib.txt";
     //bool readOk = readCameraParameters(filename, cameraMatrix, distCoeffs);
 
     cv::Mat imageCopy ;
 
-        cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
-        cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 7, 0.04f, 0.02f, dictionary);
+        //cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
+        //cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 7, 0.04f, 0.02f, dictionary);
         cv::Ptr<cv::aruco::DetectorParameters> params = cv::aruco::DetectorParameters::create();
         image.copyTo(imageCopy);
         std::vector<int> markerIds;
         std::vector<std::vector<cv::Point2f> > markerCorners;
-        cv::aruco::detectMarkers(image, board->dictionary, markerCorners, markerIds, params);
+        cv::aruco::detectMarkers(image, dict, markerCorners, markerIds, params);
         // if at least one marker detected
             if (markerIds.size() > 0) {
                 cv::aruco::drawDetectedMarkers(imageCopy, markerCorners, markerIds);
                 std::vector<cv::Point2f> charucoCorners;
                 std::vector<int> charucoIds;
-                cv::aruco::interpolateCornersCharuco(markerCorners, markerIds, image, board, charucoCorners, charucoIds, cameraMatrix, distCoeffs);
+                cv::aruco::interpolateCornersCharuco(markerCorners, markerIds, image, charuco, charucoCorners, charucoIds, cameraMatrix, distCoeffs);
                 // if at least one charuco corner detected
+
+
+
                 if (charucoIds.size() > 0) {
                     cv::Scalar color = cv::Scalar(255, 0, 0);
                     cv::aruco::drawDetectedCornersCharuco(imageCopy, charucoCorners, charucoIds, color);
-                    cv::Vec3d rvec, tvec;
-                    bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, cameraMatrix, distCoeffs, rvec, tvec);
-                    // if charuco pose is valid
+                    bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, charuco, cameraMatrix, distCoeffs, rvec, tvec);
                 }
             }
             //cv::imshow("out", imageCopy);

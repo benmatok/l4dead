@@ -69,10 +69,18 @@ class Calibrate
      cv::Ptr< cv::aruco::Dictionary > dict;
      cv::Ptr< cv::aruco::CharucoBoard > charuco; 
      int frame_number; 
+     cv::Mat cameraMatrix ;
+     cv::Mat distCoeffs;
+     std::vector<std::tuple<cv::Vec3d , cv::Vec3d > > camera_path ;
+     int test;
+
+    
     void img_cbk(const sensor_msgs::ImageConstPtr &msg);
     void detectCharucoBoardWithoutCalibration(cv::Mat image ,  std::vector<cv::Point2f> &charucoCorners , std::vector<int> &charucoIds) ;
-    void detectCharucoBoardWithCalibrationPose(cv::Mat &image ) ;
+    void detectCharucoBoardWithCalibrationPose(cv::Mat &image , cv::Vec3d &rvec , cv::Vec3d &tvec) ;
     void calibrate_camera_in(cv::Mat &image) ; 
+    void img_cbk_calibrate(const sensor_msgs::ImageConstPtr &msg);
+    
 
 
 
@@ -81,9 +89,22 @@ class Calibrate
 
     Calibrate()
     {
+
         frame_number = 0 ;
         dict = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_50);
-        charuco  = cv::aruco::CharucoBoard::create(7, 5,0.04, 0.04/2, dict);
+        charuco  = cv::aruco::CharucoBoard::create(4, 4,0.0485, 0.0485/2, dict);
+        test = 5 ; 
+
+        //double distCoeffs_array[5]  = {-0.05224373092319542, 0.0609873425248403, 0.001433938108933573, -0.0002926947407053129, -0.01567957391005009};
+        //double cameraMatrix_array[3][3] =  {{636.4715066042678, 0, 632.8146215973151} ,{0, 637.3852410290077, 380.4818147863101} , {0, 0, 1}};
+
+
+        //distCoeffs = cv::Mat(5, 1, CV_64F, distCoeffs_array);
+        distCoeffs  = (cv::Mat_<double>(1,5) <<-0.05224373092319542, 0.0609873425248403, 0.001433938108933573, -0.0002926947407053129, -0.01567957391005009);
+        cameraMatrix = (cv::Mat_<double>(3,3) <<636.4715066042678, 0, 632.8146215973151 ,0, 637.3852410290077, 380.4818147863101  , 0, 0, 1); 
+        //cameraMatrix = cv::Mat(3, 3, CV_64F, cameraMatrix_array);
+        std::cout << distCoeffs << std::endl;
+
         sub_img = m_ros_node_handle.subscribe("/camera/color/image_raw", 1000000, &Calibrate::img_cbk, this, ros::TransportHints().tcpNoDelay());
 
     }
