@@ -13,17 +13,17 @@ void  Calibrate::img_cbk(const sensor_msgs::ImageConstPtr &msg)
 {
 
     cv::Mat image = cv_bridge::toCvCopy( msg, sensor_msgs::image_encodings::BGR8 )->image.clone();
-    cv::Vec3d  rvec ;
-    cv::Vec3d tvec ; 
+    
 
-    Calibrate::detectCharucoBoardWithCalibrationPose(image ,  rvec ,  tvec ) ; 
+    //Calibrate::detectCharucoBoardWithCalibrationPose(image ,  rvec ,  tvec ) ; 
     cv::imshow(" image1",image);
     cv::waitKey(1);
-    if (rvec[0] != 0 || rvec[1] !=0 || rvec[2]!=0  || tvec[0] != 0 ||  tvec[1] !=0 || tvec[2] !=0)
-    { 
-    std::cout << "translation_camera:" <<  tvec << std::endl;
-    std::cout << "rotation_camera:" <<  rvec << std::endl;
-    }
+    image_queue.push(msg);
+    //if (rvec[0] != 0 || rvec[1] !=0 || rvec[2]!=0  || tvec[0] != 0 ||  tvec[1] !=0 || tvec[2] !=0)
+    //{ 
+    //std::cout << "translation_camera:" <<  tvec << std::endl;
+    //std::cout << "rotation_camera:" <<  rvec << std::endl;
+    //}
 
 
 
@@ -154,12 +154,12 @@ void  Calibrate::detectCharucoBoardWithCalibrationPose(cv::Mat &image  ,cv::Vec3
                 // if at least one charuco corner detected
 
 
-
                 if (charucoIds.size() > 0) {
                     cv::Scalar color = cv::Scalar(255, 0, 0);
                     cv::aruco::drawDetectedCornersCharuco(imageCopy, charucoCorners, charucoIds, color);
                     bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, charuco, cameraMatrix, distCoeffs, rvec, tvec);
                 }
+
             }
             //cv::imshow("out", imageCopy);
             //char key = (char)cv::waitKey(30);
