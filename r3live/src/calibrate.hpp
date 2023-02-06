@@ -55,7 +55,7 @@
 #include "tbb/concurrent_queue.h"
 #include<tuple>
 #include <thread>
-
+#include <Eigen/Dense>
 class Calibrate
 {
   public:
@@ -71,6 +71,23 @@ class Calibrate
      cv::Mat distCoeffs;
      tbb::concurrent_bounded_queue<sensor_msgs::ImageConstPtr > image_queue ; 
      tbb::concurrent_bounded_queue<sensor_msgs::Imu::ConstPtr > imu_queue ; 
+
+     std::vector<double> time_of_images;
+     std::vector<std::tuple<cv::Vec3d,cv::Vec3d>>  trajectory_camera;
+     std::vector<bool> is_still; 
+
+
+
+     std::vector<double> time_imu;
+     std::vector<cv::Vec3d> angular_velocities ; 
+      std::vector<cv::Vec3d> imu_accels ; 
+     cv::Vec3d gyro_bias;  
+
+
+
+     double start_time_static ; 
+     double end_time_static; 
+     double time_diff_static ;
      
     
     void img_cbk(const sensor_msgs::ImageConstPtr &msg);
@@ -79,6 +96,13 @@ class Calibrate
     void detectCharucoBoardWithCalibrationPose(cv::Mat &image , cv::Vec3d &rvec , cv::Vec3d &tvec) ;
     void calibrate_camera_in(cv::Mat &image) ; 
     void img_cbk_calibrate(const sensor_msgs::ImageConstPtr &msg);
+    void save_camera_frames();
+    void find_static_time();
+    void copyvec(cv::Vec3d &copyto , cv::Vec3d &empty);
+    void save_imu() ; 
+    void calc_gyro_bias() ; 
+    void calc_accel_bias();
+    void sphere_fit(std::vector<cv::Vec3d> &points_fit , Eigen::VectorXd &c );
 
 
 

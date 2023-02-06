@@ -9,7 +9,7 @@
   <buildtool_depend>catkin</buildtool_depend>
   <build_depend>roscpp</build_depend>
   <build_depend>livox_ros_driver</build_depend>
-
+   <build_depend>cmake_modules</build_depend>
   <run_depend>catkin</run_depend>
   <run_depend>roscpp</run_depend>
   <run_depend>livox_ros_driver</run_depend>

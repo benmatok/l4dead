@@ -16,7 +16,7 @@ void  Calibrate::img_cbk(const sensor_msgs::ImageConstPtr &msg)
     
 
     //Calibrate::detectCharucoBoardWithCalibrationPose(image ,  rvec ,  tvec ) ; 
-    cv::imshow(" image1",image);
+    cv::imshow("image1",image);
     cv::waitKey(1);
     image_queue.push(msg);
     //if (rvec[0] != 0 || rvec[1] !=0 || rvec[2]!=0  || tvec[0] != 0 ||  tvec[1] !=0 || tvec[2] !=0)
@@ -164,4 +164,87 @@ void  Calibrate::detectCharucoBoardWithCalibrationPose(cv::Mat &image  ,cv::Vec3
             //cv::imshow("out", imageCopy);
             //char key = (char)cv::waitKey(30);
                 
+}
+
+
+
+
+
+
+void Calibrate::save_camera_frames()
+{
+    is_still.push_back(true) ; 
+    bool start = true ; 
+    cv::Vec3d  last_rvec ;
+    cv::Vec3d last_tvec ;  
+    std::ofstream MyFile("/code/trajectory_camera.txt");
+    while(image_queue.size() > 0)
+    {
+
+
+
+
+
+    sensor_msgs::ImageConstPtr msg  ; 
+    image_queue.pop(msg) ; 
+
+    cv::Vec3d  rvec ;
+    cv::Vec3d tvec ; 
+    cv::Mat image = cv_bridge::toCvCopy( msg, sensor_msgs::image_encodings::BGR8 )->image.clone();
+    detectCharucoBoardWithCalibrationPose(image ,rvec , tvec) ;
+
+
+
+    if (rvec[0] != 0 || rvec[1] !=0 || rvec[2]!=0  || tvec[0] != 0 ||  tvec[1] !=0 || tvec[2] !=0)
+    { 
+        
+        tvec= -1*tvec ; 
+        rvec = -1*rvec ;
+        MyFile <<std::setprecision(64) <<  tvec[0] << " " << tvec[1] << " " << tvec[2] << std::endl;
+        if (start)
+        {
+            copyvec( rvec ,last_rvec  ) ;
+            copyvec( tvec , last_tvec ) ; 
+            start = false;
+
+         
+        }
+        else
+        {
+            double tvec_movement = cv::norm(tvec -last_tvec) ;  
+            double  rvec_movement = cv::norm(rvec -last_rvec) ;
+            if(tvec_movement < 0.001 && rvec_movement < 0.01) 
+            {
+                is_still.push_back(true); 
+                
+            } 
+
+            else
+            {
+                is_still.push_back(false)  ;
+            }
+
+
+
+
+        }
+         std::tuple<cv::Vec3d,cv::Vec3d> state = std::make_tuple(rvec , tvec);
+         trajectory_camera.push_back(state); 
+          std_msgs::Header h = msg->header;
+         double time =  double(h.stamp.sec) + double(h.stamp.nsec)*1e-9;
+         time_of_images.push_back(time); 
+
+         copyvec(rvec , last_rvec) ;
+         copyvec( tvec, last_tvec ) ; 
+
+
+
+
+
+    }
+
+
+
+
+    }
 }
