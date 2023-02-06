@@ -28,6 +28,7 @@ find_package(catkin REQUIRED COMPONENTS
                     livox_ros_driver
             )
 
+find_package(TBB REQUIRED)
 # find_package(Ceres REQUIRED)
 find_package(PCL REQUIRED)
 find_package(OpenCV REQUIRED)
@@ -165,7 +166,7 @@ target_link_libraries(r3live_meshing
 
 
 
-add_executable(calibrate src/calibrate.cpp )
+add_executable(calibrate src/calibrate.cpp src/calibrate_camera.cpp src/calibrate_imu.cpp )
 target_link_libraries(calibrate
                           ${catkin_LIBRARIES}
                           ${Boost_LIBRARIES}
@@ -174,10 +175,12 @@ target_link_libraries(calibrate
                           ${OpenCV_LIBRARIES}
                           # ${OpenMVS_LIBRARIES}
                           pcl_common 
-                          pcl_io) 
+                          pcl_io
+                          TBB::tbb) 
 
 
 
 
 
 endif()
+
