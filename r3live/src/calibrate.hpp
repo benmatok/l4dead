@@ -56,6 +56,10 @@
 #include<tuple>
 #include <thread>
 #include <Eigen/Dense>
+#include <ctime>
+#include <cstdlib>
+#include <set>
+#include <algorithm>
 class Calibrate
 {
   public:
@@ -102,7 +106,10 @@ class Calibrate
     void save_imu() ; 
     void calc_gyro_bias() ; 
     void calc_accel_bias();
-    void sphere_fit(std::vector<cv::Vec3d> &points_fit , Eigen::VectorXd &c );
+    void sphere_fit_set(std::vector<cv::Vec3d> &points_fit , Eigen::VectorXd &c , std::set<int> &sphere_indecies);
+    void sphere_fit_vector(std::vector<cv::Vec3d> &points_fit , Eigen::VectorXd &c , std::vector<int> &sphere_indecies);
+    void sphere_ransac(std::vector<cv::Vec3d>  points_sphere );
+    void find_interval(std::vector<std::tuple<double,double>> &intervals  );
 
 
 

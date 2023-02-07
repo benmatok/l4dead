@@ -31,7 +31,7 @@ void Calibrate::copyvec(cv::Vec3d &copyto , cv::Vec3d &empty)
 void start_calibration(Calibrate * calibrate_instance)
 {
 
-    while(calibrate_instance->image_queue.size() < 1000 )
+    while(calibrate_instance->image_queue.size() < 2000 )
     {
       
 
