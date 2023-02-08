@@ -31,9 +31,16 @@ void Calibrate::copyvec(cv::Vec3d &copyto , cv::Vec3d &empty)
 void start_calibration(Calibrate * calibrate_instance)
 {
 
-    while(calibrate_instance->image_queue.size() < 2000 )
+
+    int flip =  std::round(4000/6) ;
+    while(calibrate_instance->image_queue.size() < 4000 )
     {
-      
+     int conc_size = calibrate_instance->image_queue.size() ; 
+      if(conc_size % flip == 0  && conc_size!=0  )
+      {
+        std::cout <<  "flip" << conc_size << std::endl;
+
+      }
 
 
     }
@@ -44,7 +51,7 @@ void start_calibration(Calibrate * calibrate_instance)
     if(calibrate_instance->time_diff_static>0,8) 
     {
         calibrate_instance->save_imu() ; 
-        calibrate_instance->calc_gyro_bias() ; 
+        //calibrate_instance->calc_gyro_bias() ; 
 
     }
     calibrate_instance->calc_accel_bias();

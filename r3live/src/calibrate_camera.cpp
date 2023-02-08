@@ -221,7 +221,8 @@ void Calibrate::save_camera_frames()
 
             else
             {
-                is_still.push_back(false)  ;
+                //is_still.push_back(false)  ;
+                is_still.push_back(true)  ;
             }
 
 
@@ -236,15 +237,27 @@ void Calibrate::save_camera_frames()
 
          copyvec(rvec , last_rvec) ;
          copyvec( tvec, last_tvec ) ; 
+        
 
+
+
+    }
 
 
 
 
     }
 
-
-
-
+    std::ofstream File("/code/is_still.txt");
+    for(int i = 0 ;i <is_still.size() ; i++)
+    {
+        File << (int) is_still[i] << std::endl;
     }
+    File.close()  ;
+
+
+
+
+
+
 }

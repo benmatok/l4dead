@@ -80,7 +80,7 @@ class Calibrate
      std::vector<std::tuple<cv::Vec3d,cv::Vec3d>>  trajectory_camera;
      std::vector<bool> is_still; 
 
-
+     cv::Vec3d accel_bias ;
 
      std::vector<double> time_imu;
      std::vector<cv::Vec3d> angular_velocities ; 
@@ -125,6 +125,12 @@ class Calibrate
 
         //double distCoeffs_array[5]  = {-0.05224373092319542, 0.0609873425248403, 0.001433938108933573, -0.0002926947407053129, -0.01567957391005009};
         //double cameraMatrix_array[3][3] =  {{636.4715066042678, 0, 632.8146215973151} ,{0, 637.3852410290077, 380.4818147863101} , {0, 0, 1}};
+        //accel_bias[0] = 0.235079   ;  
+        //accel_bias[1] = 0.399601    ;
+        //accel_bias[2] = 0.332644    ;   
+        accel_bias[0] = 0.232997  ;
+        accel_bias[1] = 0.369458    ; 
+        accel_bias[2] = 0.577147     ; 
 
 
         //distCoeffs = cv::Mat(5, 1, CV_64F, distCoeffs_array);
@@ -134,6 +140,11 @@ class Calibrate
         std::cout << distCoeffs << std::endl;
         sub_img = m_ros_node_handle.subscribe("/camera/color/image_raw", 1000000, &Calibrate::img_cbk, this, ros::TransportHints().tcpNoDelay());
         sub_imu = m_ros_node_handle.subscribe("/camera/imu", 1000000, &Calibrate::imu_cbk, this, ros::TransportHints().tcpNoDelay());
+
+
+
+
+
 
     }
 

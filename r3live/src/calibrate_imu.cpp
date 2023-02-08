@@ -16,6 +16,13 @@ void  Calibrate::imu_cbk(const sensor_msgs::Imu::ConstPtr &msg)
 
     //std::cout << imu_msg_raw->angular_velocity[0] << std::endl;
     imu_queue.push(msg);
+
+
+
+
+
+
+
     
 
 
@@ -87,7 +94,8 @@ void  Calibrate::save_imu(){
 
 
 
-
+    //double norm_sum = 0 ;
+    //int count = 0 ; 
     std::ofstream MyFile("/code/gyro.txt");
     while(imu_queue.size() > 0)
     {
@@ -111,8 +119,10 @@ void  Calibrate::save_imu(){
 
         accel[1] =  msg->linear_acceleration.y ;
         accel[2] =  msg->linear_acceleration.z ;
-        imu_accels.push_back(accel) ; 
-         
+        imu_accels.push_back(accel-accel_bias) ; 
+         //norm_sum+=cv::norm(accel-accel_bias) ; 
+         //norm_sum+=cv::norm(accel) ; 
+         //count++;
          
          
          
@@ -121,6 +131,7 @@ void  Calibrate::save_imu(){
 
     }
     MyFile.close();
+    //std::cout << "norm_avg" << norm_sum/count << std::endl;
 }
 
 
@@ -229,7 +240,7 @@ for(int i =0 ;i<10000; i++)
         distance += (curr_point[2] - c[2] )*(curr_point[2] - c[2] ) ;
         distance = std::sqrt(distance) ; 
         double sphere_distance = std::abs(radius-distance) ; 
-        if(sphere_distance <0.001)
+        if(sphere_distance <0.01)
         {
             score +=1 ;
             agree_with_sphere.push_back(j);
@@ -268,6 +279,7 @@ for(int i =0 ;i<10000; i++)
     sphere_fit_vector(points_sphere , c,index_best_sphere);
     double radius = std::sqrt(c[3] + c[0]*c[0] + c[1]*c[1] +c[2]*c[2] ); 
     std::cout << "radius" << radius  << std::endl;
+    std::cout << "c" << c  << std::endl;
 
 
 
@@ -286,7 +298,7 @@ void Calibrate::find_interval(std::vector<std::tuple<double,double>> &intervals 
             if(!is_still[i])
             {
                 double time_diff = time_of_images[i] - time_of_images[start_index] ; 
-                if(time_diff > 1)
+                if(time_diff >   1)
                 {
                      intervals.push_back( std::make_tuple(time_of_images[start_index+1],time_of_images[i-1]) ); 
                 }
@@ -308,7 +320,7 @@ void Calibrate::find_interval(std::vector<std::tuple<double,double>> &intervals 
 
     }
 
-    if(start_index = 0 && before_true )
+    if(start_index == 0 && before_true )
     { 
         intervals.push_back(std::make_tuple(time_of_images[start_index+1],time_of_images[time_of_images.size()-1]) ) ; 
     }
@@ -325,6 +337,7 @@ void  Calibrate::calc_accel_bias(){
     std::vector<cv::Vec3d> no_movement_frames ;
     std::vector<std::tuple<double,double>> intervals ;
     find_interval(intervals) ; 
+    std::cout << "intervals" << intervals.size() << std::endl;
     for(int i = 0;i<intervals.size() ; i++ )
     {        
 
@@ -335,7 +348,9 @@ void  Calibrate::calc_accel_bias(){
         int time_index_start = upper1 -time_imu.begin();
         int time_index_end = upper2 -time_imu.begin();
 
-        for(int j = time_index_start ; j<time_index_end ; j++ )
+        //for(int j = time_index_start ; j<time_index_end ; j++ )
+
+        for(int j = 0 ; j<imu_accels.size() ; j++ )
         {
             cv::Vec3d accel = imu_accels[j];
             MyFile <<std::setprecision(64) <<  accel[0] << " " << accel[1] << " " << accel[2] << std::endl;
