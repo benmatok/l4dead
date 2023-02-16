@@ -157,6 +157,13 @@ void  Calibrate::calc_gyro_bias(){
     gyro_bias = sum*(1/counter)  ;
     std::cout << gyro_bias << std::endl;
 
+
+    for(int i = 0; i <angular_velocities.size() ; i++)
+    {
+        angular_velocities[i] = angular_velocities[i] - gyro_bias ; 
+    }
+    
+
     
 }
 

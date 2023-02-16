@@ -221,8 +221,8 @@ void Calibrate::save_camera_frames()
 
             else
             {
-                //is_still.push_back(false)  ;
-                is_still.push_back(true)  ;
+                is_still.push_back(false)  ;
+                //is_still.push_back(true)  ;
             }
 
 

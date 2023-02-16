@@ -35,6 +35,7 @@
 
 #include <opencv2/highgui/highgui.hpp>
 #include <cv_bridge/cv_bridge.h>
+#include<opencv2/opencv.hpp>
 
 #include "lib_sophus/so3.hpp"
 #include "lib_sophus/se3.hpp"
@@ -60,6 +61,7 @@
 #include <cstdlib>
 #include <set>
 #include <algorithm>
+#include <opencv2/calib3d.hpp>
 class Calibrate
 {
   public:
@@ -110,6 +112,7 @@ class Calibrate
     void sphere_fit_vector(std::vector<cv::Vec3d> &points_fit , Eigen::VectorXd &c , std::vector<int> &sphere_indecies);
     void sphere_ransac(std::vector<cv::Vec3d>  points_sphere );
     void find_interval(std::vector<std::tuple<double,double>> &intervals  );
+    void calc_extrinsic();
 
 
 
@@ -125,9 +128,9 @@ class Calibrate
 
         //double distCoeffs_array[5]  = {-0.05224373092319542, 0.0609873425248403, 0.001433938108933573, -0.0002926947407053129, -0.01567957391005009};
         //double cameraMatrix_array[3][3] =  {{636.4715066042678, 0, 632.8146215973151} ,{0, 637.3852410290077, 380.4818147863101} , {0, 0, 1}};
-        //accel_bias[0] = 0.235079   ;  
-        //accel_bias[1] = 0.399601    ;
-        //accel_bias[2] = 0.332644    ;   
+        //accel_bias[0] = 0   ;  
+        //accel_bias[1] = 0    ;
+        //accel_bias[2] = 0    ;   
         accel_bias[0] = 0.232997  ;
         accel_bias[1] = 0.369458    ; 
         accel_bias[2] = 0.577147     ; 
