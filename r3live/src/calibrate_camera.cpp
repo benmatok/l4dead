@@ -12,19 +12,19 @@
 void  Calibrate::img_cbk(const sensor_msgs::ImageConstPtr &msg)
 {
 
-    cv::Mat image = cv_bridge::toCvCopy( msg, sensor_msgs::image_encodings::BGR8 )->image.clone();
+    cv::Mat image = cv_bridge::toCvCopy( msg, sensor_msgs::image_encodings::BGR8 )->image.clone(); 
+    //bool valid = detectCharucoBoardWithCalibrationPose(image,lrvec , ltvec) ; 
     
-
     //Calibrate::detectCharucoBoardWithCalibrationPose(image ,  rvec ,  tvec ) ; 
-    cv::imshow("image1",image);
-    cv::waitKey(1);
+   // cv::imshow("image1",image);
+    //cv::waitKey(1);
     image_queue.push(msg);
     //if (rvec[0] != 0 || rvec[1] !=0 || rvec[2]!=0  || tvec[0] != 0 ||  tvec[1] !=0 || tvec[2] !=0)
     //{ 
     //std::cout << "translation_camera:" <<  tvec << std::endl;
     //std::cout << "rotation_camera:" <<  rvec << std::endl;
     //}
-
+    //std::cout << valid << std::endl;
 
 
 
@@ -131,12 +131,12 @@ std::cout << cameraMatrix << std::endl ;
 
 }
 
-
-void  Calibrate::detectCharucoBoardWithCalibrationPose(cv::Mat &image  ,cv::Vec3d &rvec , cv::Vec3d &tvec )
+bool  Calibrate::detectCharucoBoardWithCalibrationPose(cv::Mat &image  ,cv::Vec3d &rvec , cv::Vec3d &tvec )
 {
     //bool readOk = readCameraParameters(filename, cameraMatrix, distCoeffs);
-
+    bool valid = false ; 
     cv::Mat imageCopy ;
+
 
         //cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
         //cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 7, 0.04f, 0.02f, dictionary);
@@ -152,18 +152,14 @@ void  Calibrate::detectCharucoBoardWithCalibrationPose(cv::Mat &image  ,cv::Vec3
                 std::vector<int> charucoIds;
                 cv::aruco::interpolateCornersCharuco(markerCorners, markerIds, image, charuco, charucoCorners, charucoIds, cameraMatrix, distCoeffs);
                 // if at least one charuco corner detected
-
-
                 if (charucoIds.size() > 0) {
-                    cv::Scalar color = cv::Scalar(255, 0, 0);
-                    cv::aruco::drawDetectedCornersCharuco(imageCopy, charucoCorners, charucoIds, color);
-                    bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, charuco, cameraMatrix, distCoeffs, rvec, tvec);
+                     valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, charuco, cameraMatrix, distCoeffs, rvec, tvec );
                 }
 
             }
             //cv::imshow("out", imageCopy);
             //char key = (char)cv::waitKey(30);
-                
+    return valid ; 
 }
 
 
@@ -178,6 +174,9 @@ void Calibrate::save_camera_frames()
     cv::Vec3d  last_rvec ;
     cv::Vec3d last_tvec ;  
     std::ofstream MyFile("/code/trajectory_camera.txt");
+    std::ofstream trfile("/code/tvec_rvec.txt");
+    std::ofstream is_valid("/code/valid.txt");
+    int count  = 0 ;
     while(image_queue.size() > 0)
     {
 
@@ -191,8 +190,12 @@ void Calibrate::save_camera_frames()
     cv::Vec3d  rvec ;
     cv::Vec3d tvec ; 
     cv::Mat image = cv_bridge::toCvCopy( msg, sensor_msgs::image_encodings::BGR8 )->image.clone();
-    detectCharucoBoardWithCalibrationPose(image ,rvec , tvec) ;
-
+    bool valid = detectCharucoBoardWithCalibrationPose(image ,rvec , tvec) ;
+    is_valid << valid << std::endl;
+    std::ostringstream name;
+    //name << "/code/images/im_" << count << ".png";
+    //count++;
+    //cv::imwrite(name.str(), image);
 
 
     if (rvec[0] != 0 || rvec[1] !=0 || rvec[2]!=0  || tvec[0] != 0 ||  tvec[1] !=0 || tvec[2] !=0)
@@ -212,9 +215,24 @@ void Calibrate::save_camera_frames()
         else
         {
             double tvec_movement = cv::norm(tvec -last_tvec) ;  
-            double  rvec_movement = cv::norm(rvec -last_rvec) ;
-            if(tvec_movement < 0.001 && rvec_movement < 0.01) 
+            cv::Mat r1 ;
+            cv::Rodrigues(rvec,r1);
+            cv::Mat r2 ;
+            cv::Rodrigues(last_rvec,r2);
+
+            cv::Vec3d rvec_mv  ; 
+            cv::Rodrigues(r2.t() * r1 , rvec_mv) ; 
+
+
+
+            //double  rvec_movement = cv::norm(rvec -last_rvec) ;
+            double  rvec_movement = cv::norm(rvec_mv) ;
+
+
+            trfile << std::setprecision(64) << tvec_movement << " " << rvec_movement << std::endl ; 
+            if(tvec_movement < 0.01 && rvec_movement < 0.015) 
             {
+
                 is_still.push_back(true); 
                 
             } 
@@ -231,9 +249,11 @@ void Calibrate::save_camera_frames()
         }
          std::tuple<cv::Vec3d,cv::Vec3d> state = std::make_tuple(rvec , tvec);
          trajectory_camera.push_back(state); 
+
           std_msgs::Header h = msg->header;
          double time =  double(h.stamp.sec) + double(h.stamp.nsec)*1e-9;
          time_of_images.push_back(time); 
+         images.push_back(image);
 
          copyvec(rvec , last_rvec) ;
          copyvec( tvec, last_tvec ) ; 
@@ -252,11 +272,16 @@ void Calibrate::save_camera_frames()
     for(int i = 0 ;i <is_still.size() ; i++)
     {
         File << (int) is_still[i] << std::endl;
+        std::ostringstream name;
+        name << "/code/images/rotated_im_" << i << ".png";
+        cv::imwrite(name.str(), images[i]);
     }
     File.close()  ;
 
+    trfile.close() ;
 
 
+    is_valid.close();
 
 
 

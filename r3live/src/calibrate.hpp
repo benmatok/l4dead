@@ -77,7 +77,7 @@ class Calibrate
      cv::Mat distCoeffs;
      tbb::concurrent_bounded_queue<sensor_msgs::ImageConstPtr > image_queue ; 
      tbb::concurrent_bounded_queue<sensor_msgs::Imu::ConstPtr > imu_queue ; 
-
+    std::vector<cv::Mat> images ;
      std::vector<double> time_of_images;
      std::vector<std::tuple<cv::Vec3d,cv::Vec3d>>  trajectory_camera;
      std::vector<bool> is_still; 
@@ -87,8 +87,7 @@ class Calibrate
      std::vector<double> time_imu;
      std::vector<cv::Vec3d> angular_velocities ; 
       std::vector<cv::Vec3d> imu_accels ; 
-     cv::Vec3d gyro_bias;  
-
+    cv::Vec3d gyro_bias;  
 
 
      double start_time_static ; 
@@ -99,7 +98,7 @@ class Calibrate
     void img_cbk(const sensor_msgs::ImageConstPtr &msg);
     void imu_cbk(const sensor_msgs::Imu::ConstPtr &msg);
     void detectCharucoBoardWithoutCalibration(cv::Mat image ,  std::vector<cv::Point2f> &charucoCorners , std::vector<int> &charucoIds) ;
-    void detectCharucoBoardWithCalibrationPose(cv::Mat &image , cv::Vec3d &rvec , cv::Vec3d &tvec) ;
+    bool detectCharucoBoardWithCalibrationPose(cv::Mat &image , cv::Vec3d &rvec , cv::Vec3d &tvec) ;
     void calibrate_camera_in(cv::Mat &image) ; 
     void img_cbk_calibrate(const sensor_msgs::ImageConstPtr &msg);
     void save_camera_frames();
@@ -111,10 +110,10 @@ class Calibrate
     void sphere_fit_set(std::vector<cv::Vec3d> &points_fit , Eigen::VectorXd &c , std::set<int> &sphere_indecies);
     void sphere_fit_vector(std::vector<cv::Vec3d> &points_fit , Eigen::VectorXd &c , std::vector<int> &sphere_indecies);
     void sphere_ransac(std::vector<cv::Vec3d>  points_sphere );
-    void find_interval(std::vector<std::tuple<double,double>> &intervals  );
+    void find_interval(std::vector<std::tuple<double,double>> &intervals  , std::vector<int>  &end_index  );
     void calc_extrinsic();
 
-
+    void calc_imu_state( double start_time , double end_time ,cv::Vec3d & imu_translation , cv::Mat & imu_rotation)    ;
 
 
 

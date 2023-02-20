@@ -119,7 +119,7 @@ void  Calibrate::save_imu(){
 
         accel[1] =  msg->linear_acceleration.y ;
         accel[2] =  msg->linear_acceleration.z ;
-        imu_accels.push_back(accel-accel_bias) ; 
+        imu_accels.push_back(accel) ; 
          //norm_sum+=cv::norm(accel-accel_bias) ; 
          //norm_sum+=cv::norm(accel) ; 
          //count++;
@@ -155,13 +155,7 @@ void  Calibrate::calc_gyro_bias(){
         }
     }
     gyro_bias = sum*(1/counter)  ;
-    std::cout << gyro_bias << std::endl;
-
-
-    for(int i = 0; i <angular_velocities.size() ; i++)
-    {
-        angular_velocities[i] = angular_velocities[i] - gyro_bias ; 
-    }
+    std::cout << "first gyro bias" << gyro_bias << std::endl;
     
 
     
@@ -265,6 +259,16 @@ for(int i =0 ;i<10000; i++)
 
 
 
+
+
+
+
+
+
+
+
+
+
     if (score>max_score)
     {
         max_score = score; 
@@ -295,7 +299,7 @@ for(int i =0 ;i<10000; i++)
 
 
 
-void Calibrate::find_interval(std::vector<std::tuple<double,double>> &intervals  ){
+void Calibrate::find_interval(std::vector<std::tuple<double,double>> &intervals   , std::vector<int>  &end_index ){
     bool before_true = true ; 
     int start_index = 0  ; 
     for(int i = 1;i<is_still.size() -1 ; i++ )
@@ -308,6 +312,7 @@ void Calibrate::find_interval(std::vector<std::tuple<double,double>> &intervals 
                 if(time_diff >   1)
                 {
                      intervals.push_back( std::make_tuple(time_of_images[start_index+1],time_of_images[i-1]) ); 
+                     end_index.push_back(i-1) ; 
                 }
                 before_true = false;
             }
@@ -343,7 +348,8 @@ void  Calibrate::calc_accel_bias(){
     std::ofstream MyFile("/code/accels.txt");
     std::vector<cv::Vec3d> no_movement_frames ;
     std::vector<std::tuple<double,double>> intervals ;
-    find_interval(intervals) ; 
+    std::vector<int> end_indx ; 
+    find_interval(intervals ,end_indx) ; 
     std::cout << "intervals" << intervals.size() << std::endl;
     for(int i = 0;i<intervals.size() ; i++ )
     {        
@@ -360,7 +366,7 @@ void  Calibrate::calc_accel_bias(){
         for(int j = 0 ; j<imu_accels.size() ; j++ )
         {
             cv::Vec3d accel = imu_accels[j];
-            MyFile <<std::setprecision(64) <<  accel[0] << " " << accel[1] << " " << accel[2] << std::endl;
+            MyFile <<std::setprecision(9) <<  accel[0] << " " << accel[1] << " " << accel[2] << std::endl;
             no_movement_frames.push_back(accel);
         }
 
