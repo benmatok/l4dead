@@ -123,6 +123,7 @@ void create_transformation(cv::Vec3d &translation , cv::Vec3d &rotation_vec , cv
         for(int j = 0 ; j <3 ; j++)
         {
              transformation.at<double>(i, j) = rotation.at<double>(i, j);
+
         }
     }
     transformation.at<double>(0,3)=  translation[0] ; 
@@ -137,7 +138,7 @@ void create_transformation(cv::Vec3d &translation , cv::Vec3d &rotation_vec , cv
 
 void extract_rot_and_trans (cv::Vec3d &translation , cv::Vec3d  &rotation_vec , cv::Mat &transformation)
 {
-    cv::Mat rotation ;
+    cv::Mat rotation  = cv::Mat::zeros(4 ,4,CV_64F);;
     for (int i = 0 ; i<3;i++)
     {
         for(int j = 0 ; j <3 ; j++)
@@ -158,24 +159,138 @@ void extract_rot_and_trans (cv::Vec3d &translation , cv::Vec3d  &rotation_vec , 
 
 
 
+
+
+
+
+
+void log_se3(cv::Vec3d &translation , cv::Vec3d &rotation , cv::Mat &transformation)
+{
+    cv::Mat rotation_matrix =  cv::Mat::zeros(3 ,3,CV_64F);; 
+
+
+    for(int i = 0 ; i<3; i++)
+    {
+        for(int j = 0;j<3;j++)
+        {
+           rotation_matrix.at<double>(i,j) =  transformation.at<double>(i,j) ; 
+        }
+    }
+    cv::Rodrigues(rotation_matrix,rotation ) ;
+    cv::Mat skew_rot = cv::Mat::zeros(3 ,3,CV_64F);
+    skew_rot.at<double>(1,0) = rotation[2] ; 
+    skew_rot.at<double>(2,0) =  -1*rotation[1] ;
+    skew_rot.at<double>(0,1) = -1*rotation[2] ;  
+     skew_rot.at<double>(2,1) = rotation[0] ;  
+     skew_rot.at<double>(0,2) = rotation[1] ; 
+     skew_rot.at<double>(1,2) = -1*rotation[0] ;  
+    double rot_trace = cv::trace(rotation_matrix)[0] ; 
+    double thetha = std::acos((rot_trace -1 )/2) ;
+
+    cv::Mat v = cv::Mat::eye(3 , 3  , CV_64F); 
+    if(thetha!=0)
+    {
+    v+=  ( (1-std::cos(thetha))/(thetha*thetha)) *skew_rot ;
+    v+=  (  (thetha - std::sin(thetha) )/ (thetha*thetha*thetha ) )*skew_rot*skew_rot  ;  
+    }
+
+    cv::Vec3d p ; 
+    p[0] = transformation.at<double>(0,3) ; 
+    p[1] = transformation.at<double>(1,3) ; 
+    p[2] = transformation.at<double>(2,3) ; 
+    translation = to_vec3d(v.inv() * p ) ; 
+
+
+
+
+
+
+
+
+}
+void exp_se3(cv::Vec3d &translation , cv::Vec3d &rotation , cv::Mat &transformation)
+{
+    cv::Mat rotation_matrix ;
+    cv::Rodrigues(rotation , rotation_matrix) ; 
+    double rot_trace = cv::trace(rotation_matrix)[0] ; 
+
+    double thetha = std::acos((rot_trace -1 )/2) ;
+    cv::Mat skew_rot = cv::Mat::zeros(3 ,3,CV_64F);
+    skew_rot.at<double>(1,0) = rotation[2] ; 
+    skew_rot.at<double>(2,0) =  -1*rotation[1] ;
+    skew_rot.at<double>(0,1) = -1*rotation[2] ;  
+     skew_rot.at<double>(2,1) = rotation[0] ;  
+     skew_rot.at<double>(0,2) = rotation[1] ; 
+     skew_rot.at<double>(1,2) = -1*rotation[0] ;   
+
+
+    
+    cv::Mat v = cv::Mat::eye(3, 3 , CV_64F); 
+    if(thetha!=0)
+    {
+    v +=  ( (1-std::cos(thetha))/(thetha*thetha)) *skew_rot ;
+    v+=  (  (thetha - std::sin(thetha))/(thetha*thetha*thetha ))    *skew_rot*skew_rot  ; 
+    }
+
+    cv::Vec3d p =   to_vec3d(v*translation) ; 
+    transformation = cv::Mat::zeros(4 ,4,CV_64F);
+    for(int i = 0 ; i<3; i++)
+    {
+        for(int j = 0;j<3;j++)
+        {
+            transformation.at<double>(i,j) = rotation_matrix.at<double>(i,j) ; 
+        }
+    }
+
+
+    for(int i = 0 ; i<3; i++)
+    {
+        transformation.at<double>(i,3) =  p[i] ;   
+    }
+    transformation.at<double>(3,3) = 1 ;
+
+
+
+
+
+
+
+
+
+
+}
+
+
+
 void calc_res(cv::Vec3d &i2c_trans , cv::Vec3d &i2c_rot , std::tuple<cv::Vec3d , cv::Vec3d> &first_pose , 
 std::tuple<cv::Vec3d , cv::Vec3d> &last_pose  , cv::Vec3d  &imu_translation ,cv::Vec3d  &imu_rotation,cv::Mat &residual , int i )
 {
+        cv::Mat i2c  ; 
+        exp_se3(i2c_trans,i2c_rot,i2c ) ; 
 
-        cv::Mat i2c ;
-        create_transformation(i2c_trans,i2c_rot,i2c ) ; 
-        cv::Mat c1 ; 
-        create_transformation(std::get<1>(first_pose ) ,std::get<0>(first_pose ) ,c1 ) ;
+        cv::Mat c1  ; 
+        exp_se3(std::get<1>(first_pose ) ,std::get<0>(first_pose ) ,c1 ) ; 
+
+
+
         cv::Mat c2 ; 
-        create_transformation(std::get<1>(last_pose ) ,std::get<0>(last_pose ) ,c2 ) ;
-        cv::Mat i_measure ; 
-        create_transformation(imu_translation ,imu_rotation ,i_measure ) ;
+        exp_se3(std::get<1>(last_pose ) ,std::get<0>(last_pose ) ,c2  ) ; 
+
+
+
+
+        cv::Mat i_measure  ; 
+        exp_se3(imu_translation ,imu_rotation ,i_measure ) ;
+
         cv::Mat c2c1 = c1.inv()* c2 ;
         cv::Mat mat_mul = c2c1 * i2c*  i_measure * i2c.inv() ; 
-
         cv::Vec3d rot_error ; 
-        cv::Vec3d trans_error  ; 
-        extract_rot_and_trans(trans_error , rot_error , mat_mul ) ; 
+        cv::Vec3d trans_error  ;
+        log_se3(trans_error , rot_error , mat_mul ) ;
+
+
+
+
         residual.at<double>(6*i+ 0) = rot_error[0] ; 
         residual.at<double>(6*i + 1) =  rot_error[1] ;  
         residual.at<double>(6*i +2) = rot_error[2] ;   
@@ -183,6 +298,10 @@ std::tuple<cv::Vec3d , cv::Vec3d> &last_pose  , cv::Vec3d  &imu_translation ,cv:
         residual.at<double>(6*i +4) = trans_error[1] ; 
         residual.at<double>(6*i +5) = trans_error[2] ; 
 }
+
+
+
+
 
 
 void Calibrate::calc_extrinsic()
@@ -195,12 +314,10 @@ void Calibrate::calc_extrinsic()
 
     std::cout << "intervals" << intervals.size() << std::endl;  
     cv::Mat residual = cv::Mat::zeros(6*intervals.size() ,1,CV_64F);
-    cv::Mat jacobian= cv::Mat::zeros(6*intervals.size() ,6*intervals.size() ,CV_64F);
+    cv::Mat jacobian= cv::Mat::zeros(6*intervals.size() ,6 ,CV_64F);
     cv::Vec3d i2c_rot = cv::Vec3d(0,0,0) ; 
     cv::Vec3d i2c_trans = cv::Vec3d(0,0,0) ; 
     bool first = true ; 
-
-
     for(int i = 0; i<intervals.size() ; i++)
     {
 
@@ -243,27 +360,25 @@ void Calibrate::calc_extrinsic()
         cv::Vec3d imu_rotation ; 
         cv::Rodrigues(imu_rotation_mat , imu_rotation);
         calc_res(i2c_trans , i2c_rot , first_pose , last_pose  , imu_translation ,imu_rotation, residual , i ) ; 
-
-
+        std::cout << residual << std::endl;
         for(int j = 0 ;  j<3 ; j++)
         {
+            
 
+            i2c_trans[j] += h_translation ;
+            cv::Mat temp_res = cv::Mat::zeros(6*intervals.size() ,1,CV_64F);
+            calc_res(i2c_trans , i2c_rot , first_pose , last_pose  , imu_translation ,imu_rotation, temp_res , i ) ;
+            i2c_trans[j] -= h_translation ;
             for(int k = 0 ;k<6 ; k++)
             {
 
 
-            i2c_trans[k] += h_translation ;
-            cv::Mat temp_res = cv::Mat::zeros(6*intervals.size() ,1,CV_64F);
-            calc_res(i2c_trans , i2c_rot , first_pose , last_pose  , imu_translation ,imu_rotation, temp_res , i ) ;
-            i2c_trans[k] -= h_translation ;
 
 
-
-
-                int res_index = 6* i + j; 
-
+                int res_index = 6* i + k;
                 double derrivitive= (temp_res.at<double>(res_index) - residual.at<double>(res_index))/h_translation ; 
-                jacobian.at<double>(res_index,k) = derrivitive ; 
+                //std::cout << derrivitive << std::endl; 
+                jacobian.at<double>(res_index,j) = derrivitive ;
             }
 
 
@@ -273,29 +388,41 @@ void Calibrate::calc_extrinsic()
         for(int j = 0 ;  j<3 ; j++)
         {
 
+
+
+            i2c_rot[j] += h_rotation ;
+            cv::Mat temp_res = cv::Mat::zeros(6*intervals.size() ,1,CV_64F);
+            calc_res(i2c_trans , i2c_rot , first_pose , last_pose  , imu_translation ,imu_rotation, temp_res , i ) ;
+            i2c_rot[j] -= h_rotation ;
             for(int k = 0 ;k<6 ; k++)
             {
 
 
-            i2c_rot[k] += h_rotation ;
-            cv::Mat temp_res = cv::Mat::zeros(6*intervals.size() ,1,CV_64F);
-            calc_res(i2c_trans , i2c_rot , first_pose , last_pose  , imu_translation ,imu_rotation, temp_res , i ) ;
-            i2c_rot[k] -= h_rotation ;
 
 
 
-                int res_index = 6* i + j+3; 
+                int res_index = 6* i + k; 
 
                 double derrivitive= (temp_res.at<double>(res_index) - residual.at<double>(res_index)) /h_rotation ; 
-                jacobian.at<double>(res_index,k) = derrivitive ; 
+
+                jacobian.at<double>(res_index,j+3) = derrivitive ; 
+
             }
 
 
         }
+
+
+
+
+
         
 
 
     }
+
+
+
 
     residual = -1*residual ; 
     cv::Mat delta ; 
