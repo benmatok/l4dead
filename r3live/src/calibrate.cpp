@@ -8,9 +8,10 @@
 
 
 
-#define h_translation  0.01
-#define h_rotation  0.01
-
+#define h_translation  1e-5
+#define h_rotation  1e-5
+#define h_gyro_bias  1e-5
+#define h_accel_bias  1e-5
 void Calibrate::copyvec(cv::Vec3d &copyto , cv::Vec3d &empty)
 {
     empty[0] = copyto[0] ; 
@@ -34,10 +35,15 @@ cv::Vec3d to_vec3d(cv::Mat const& m)
 
 
 
-void Calibrate::calc_imu_state( double start_time , double end_time ,cv::Vec3d & imu_translation , cv::Mat & imu_rotation)
+void Calibrate::calc_imu_state( double start_time , double end_time ,cv::Vec3d & imu_translation , cv::Mat & imu_rotation ,cv::Mat &camera2charuco_rotation  )
 { 
+            cv::Mat i2c_rotation_mat ;
 
-            imu_rotation =  (cv::Mat_<double>(3,3) << 1, 0, 0, 0, 1, 0, 0, 0, 1); 
+            cv::Rodrigues(i2c_rot, i2c_rotation_mat);
+
+            cv::Mat char2w_rotation_matrix ;
+            cv::Rodrigues(cha2w_rot,  char2w_rotation_matrix);
+            imu_rotation = char2w_rotation_matrix*camera2charuco_rotation *i2c_rotation_mat ; 
             //cv::Vec3d imu_translation ;
             imu_translation[0] = 0; 
             imu_translation[1] = 0;
@@ -50,21 +56,13 @@ void Calibrate::calc_imu_state( double start_time , double end_time ,cv::Vec3d &
             imu_velocity[2] = 0;
             double dt_imu = time_imu[2] -  time_imu[1] ; 
             std::cout << dt_imu << std::endl;
-            cv::Vec3d gravity ;
-            bool first = true; 
+            cv::Vec3d gravity = cv::Vec3d(0,0,9.823);
            for(int i = 0  ; i < time_imu.size()    ; i++)
             {
 
 
                 if(time_imu[i] >= start_time && time_imu[i] <= end_time  )
                 {
-                if(first)
-                {
-                    gravity = imu_accels[i] - accel_bias ; 
-                    first = false ; 
-
-                }
-                else{
                 cv::Vec3d curr_angular_velocity = angular_velocities[i] -gyro_bias ; 
                  cv::Mat curr_rotation ; 
                 cv::Rodrigues(curr_angular_velocity *dt_imu, curr_rotation );
@@ -76,10 +74,7 @@ void Calibrate::calc_imu_state( double start_time , double end_time ,cv::Vec3d &
                 imu_translation = imu_translation + dt_imu*imu_velocity +  (0.5*dt_imu*dt_imu)*curr_accel  ; 
                 //std::cout << curr_accel << std::endl;
                 imu_velocity = imu_velocity +  curr_accel*dt_imu ; 
-                }
                 
-
-
                 }
 
 
@@ -184,8 +179,8 @@ void log_se3(cv::Vec3d &translation , cv::Vec3d &rotation , cv::Mat &transformat
      skew_rot.at<double>(2,1) = rotation[0] ;  
      skew_rot.at<double>(0,2) = rotation[1] ; 
      skew_rot.at<double>(1,2) = -1*rotation[0] ;  
-    double rot_trace = cv::trace(rotation_matrix)[0] ; 
-    double thetha = std::acos((rot_trace -1 )/2) ;
+    //double rot_trace = cv::trace(rotation_matrix)[0] ; 
+    double thetha = cv::norm(rotation) ; //std::acos((rot_trace -1 )/2) ;
 
     cv::Mat v = cv::Mat::eye(3 , 3  , CV_64F); 
     if(thetha!=0)
@@ -212,9 +207,15 @@ void exp_se3(cv::Vec3d &translation , cv::Vec3d &rotation , cv::Mat &transformat
 {
     cv::Mat rotation_matrix ;
     cv::Rodrigues(rotation , rotation_matrix) ; 
-    double rot_trace = cv::trace(rotation_matrix)[0] ; 
+    //double rot_trace = cv::trace(rotation_matrix)[0] ; 
 
-    double thetha = std::acos((rot_trace -1 )/2) ;
+    //double thetha = std::acos((rot_trace -1 )/2) ;
+
+
+    double thetha = cv::norm(rotation) ;  //std::acos((rot_trace -1 )/2) ;
+
+
+
     cv::Mat skew_rot = cv::Mat::zeros(3 ,3,CV_64F);
     skew_rot.at<double>(1,0) = rotation[2] ; 
     skew_rot.at<double>(2,0) =  -1*rotation[1] ;
@@ -291,12 +292,26 @@ std::tuple<cv::Vec3d , cv::Vec3d> &last_pose  , cv::Vec3d  &imu_translation ,cv:
 
 
 
+
+
+
+
+
+
+
+
+        
+
+
+
         residual.at<double>(6*i+ 0) = rot_error[0] ; 
         residual.at<double>(6*i + 1) =  rot_error[1] ;  
         residual.at<double>(6*i +2) = rot_error[2] ;   
         residual.at<double>(6*i +3) = trans_error[0] ; 
         residual.at<double>(6*i +4) = trans_error[1] ; 
         residual.at<double>(6*i +5) = trans_error[2] ; 
+
+
 }
 
 
@@ -314,10 +329,22 @@ void Calibrate::calc_extrinsic()
 
     std::cout << "intervals" << intervals.size() << std::endl;  
     cv::Mat residual = cv::Mat::zeros(6*intervals.size() ,1,CV_64F);
-    cv::Mat jacobian= cv::Mat::zeros(6*intervals.size() ,6 ,CV_64F);
-    cv::Vec3d i2c_rot = cv::Vec3d(0,0,0) ; 
-    cv::Vec3d i2c_trans = cv::Vec3d(0,0,0) ; 
+    cv::Mat jacobian= cv::Mat::zeros(6*intervals.size() ,6+6+3 ,CV_64F);
+
+
     bool first = true ; 
+
+
+
+
+
+
+
+
+
+
+
+
     for(int i = 0; i<intervals.size() ; i++)
     {
 
@@ -352,39 +379,88 @@ void Calibrate::calc_extrinsic()
 
        //std::tuple<double,double >  time_measure = std::make_tuple(time_of_images[end_index[i]] , time_of_images[camera_index] ); 
         cv::Mat imu_rotation_mat;
-        cv::Vec3d imu_translation;
+        cv::Vec3d imu_translation;                                   
         calc_imu_state( time_of_images[end_index[i]]  , time_of_images[camera_index],  imu_translation ,  imu_rotation_mat  ) ; 
         std::cout << "index "<< end_index[i]<<"," <<  camera_index  <<"  trans imu " << cv::norm(imu_translation) << std::endl ; 
         std::tuple<cv::Vec3d ,cv::Vec3d > last_pose =   trajectory_camera[camera_index] ;
-        cv::Mat residual = cv::Mat::zeros(6*intervals.size() ,1,CV_64F);
         cv::Vec3d imu_rotation ; 
         cv::Rodrigues(imu_rotation_mat , imu_rotation);
+
+
+
+        cv::Mat camera2charu_rotation ;
+         cv::Rodrigues(std::get<0>(first_pose) ,  camera2charu_rotation );
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         calc_res(i2c_trans , i2c_rot , first_pose , last_pose  , imu_translation ,imu_rotation, residual , i ) ; 
-        std::cout << residual << std::endl;
+
+        //std::cout << residual << std::endl;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        // derrivative translation
         for(int j = 0 ;  j<3 ; j++)
         {
             
 
             i2c_trans[j] += h_translation ;
             cv::Mat temp_res = cv::Mat::zeros(6*intervals.size() ,1,CV_64F);
+            calc_imu_state( time_of_images[end_index[i]]  , time_of_images[camera_index],  imu_translation ,  imu_rotation_mat , camera2charu_rotation  ) ; 
             calc_res(i2c_trans , i2c_rot , first_pose , last_pose  , imu_translation ,imu_rotation, temp_res , i ) ;
             i2c_trans[j] -= h_translation ;
             for(int k = 0 ;k<6 ; k++)
             {
 
 
-
-
                 int res_index = 6* i + k;
                 double derrivitive= (temp_res.at<double>(res_index) - residual.at<double>(res_index))/h_translation ; 
                 //std::cout << derrivitive << std::endl; 
-                jacobian.at<double>(res_index,j) = derrivitive ;
+                jacobian.at<double>(res_index,j+3) = derrivitive ;
             }
 
 
 
         }
 
+        // derrivative rotation
         for(int j = 0 ;  j<3 ; j++)
         {
 
@@ -392,6 +468,7 @@ void Calibrate::calc_extrinsic()
 
             i2c_rot[j] += h_rotation ;
             cv::Mat temp_res = cv::Mat::zeros(6*intervals.size() ,1,CV_64F);
+            calc_imu_state( time_of_images[end_index[i]]  , time_of_images[camera_index],  imu_translation ,  imu_rotation_mat , camera2charu_rotation ) ; 
             calc_res(i2c_trans , i2c_rot , first_pose , last_pose  , imu_translation ,imu_rotation, temp_res , i ) ;
             i2c_rot[j] -= h_rotation ;
             for(int k = 0 ;k<6 ; k++)
@@ -405,12 +482,105 @@ void Calibrate::calc_extrinsic()
 
                 double derrivitive= (temp_res.at<double>(res_index) - residual.at<double>(res_index)) /h_rotation ; 
 
-                jacobian.at<double>(res_index,j+3) = derrivitive ; 
+                jacobian.at<double>(res_index,j) = derrivitive ; 
 
             }
 
 
         }
+
+
+        //derrivative gyro bias 
+    for(int k = 0 ; k<3;k++)
+    {
+
+        gyro_bias[k]+=h_gyro_bias ; 
+        calc_imu_state( time_of_images[end_index[i]]  , time_of_images[camera_index],  imu_translation ,  imu_rotation_mat  ) ;
+        cv::Mat temp_res = cv::Mat::zeros(6*intervals.size() ,1,CV_64F);
+        calc_res(i2c_trans , i2c_rot , first_pose , last_pose  , imu_translation ,imu_rotation, temp_res , i ) ; 
+        gyro_bias[k]-=h_gyro_bias ; 
+
+        for(int j = 0 ; j<6;i++)
+        {
+            int res_index = 6* i + j;
+            double derrivitive= (temp_res.at<double>(res_index) - residual.at<double>(res_index))/h_gyro_bias ; 
+            jacobian.at<double>(res_index, 6+k ) = derrivitive ;
+        }
+
+    }
+
+
+    //derivative accel bias
+    for(int k =0 ; k<3;k++)
+        {
+        accel_bias[k]+=h_accel_bias ; 
+        calc_imu_state( time_of_images[end_index[i]]  , time_of_images[camera_index],  imu_translation ,  imu_rotation_mat , camera2charu_rotation  ) ; 
+        cv::Mat temp_res = cv::Mat::zeros(6*intervals.size() ,1,CV_64F);
+        calc_res(i2c_trans , i2c_rot , first_pose , last_pose  , imu_translation ,imu_rotation, temp_res , i ) ; 
+        accel_bias[k]-=h_accel_bias ; 
+
+         for(int j = 0 ; j<6;i++)
+        {
+            int res_index = 6* i + j;
+            double derrivitive= (temp_res.at<double>(res_index) - residual.at<double>(res_index))/h_accel_bias ; 
+            jacobian.at<double>(res_index, 6+3+k ) = derrivitive ;
+
+        }
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   //derivative charuco to world
+    for(int k =0 ; k<3;k++)
+        {
+        cha2w_rot[k]+=h_accel ; 
+        calc_imu_state( time_of_images[end_index[i]]  , time_of_images[camera_index],  imu_translation ,  imu_rotation_mat  ) ; 
+        calc_res(i2c_trans , i2c_rot , first_pose , last_pose  , imu_translation ,imu_rotation, temp_res , i ) ; 
+
+        cha2w_rot-=h_accel ; 
+        cv::Mat temp_res = cv::Mat::zeros(6*intervals.size() ,1,CV_64F);
+         for(int j = 0 ; j<6;i++)
+        {
+            int res_index = 6* i + j;
+            double derrivitive= (temp_res.at<double>(res_index) - residual.at<double>(res_index))/h_accel_bias ; 
+            jacobian.at<double>(res_index, 12+k ) = derrivitive ;
+
+        }
+
+        }
+
+
+
+
+
+
+
+
+        }
+
+
+
+
+
+
+
+
+        
+
+
+
+
 
 
 
@@ -425,9 +595,16 @@ void Calibrate::calc_extrinsic()
 
 
     residual = -1*residual ; 
-    cv::Mat delta ; 
+    cv::Mat delta ;
+    double min_jacob  ; 
+    double max_jacob ; 
+
+    cv::minMaxIdx(jacobian, &min_jacob , &max_jacob);
+    std::cout << max_jacob << std::endl;
     cv::solve(jacobian.t() * jacobian , jacobian.t() *residual , delta);
-    std::cout << delta << std::endl;
+    std::cout << "delta" << delta << std::endl;
+
+
 
 
 

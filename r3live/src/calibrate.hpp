@@ -93,6 +93,10 @@ class Calibrate
      double start_time_static ; 
      double end_time_static; 
      double time_diff_static ;
+   cv::Vec3d i2c_rot ; 
+    cv::Vec3d i2c_trans ; 
+    cv::Vec3d a2w_rot  ; 
+    cv::Vec3d a2w_trans  ;  
      
     
     void img_cbk(const sensor_msgs::ImageConstPtr &msg);
@@ -133,6 +137,12 @@ class Calibrate
         accel_bias[0] = 0.232997  ;
         accel_bias[1] = 0.369458    ; 
         accel_bias[2] = 0.577147     ; 
+
+
+
+        i2c_rot = cv::Vec3d(0,0,0) ; 
+        i2c_trans = cv::Vec3d(0,0,0) ; 
+        cha2w_rot = cv::Vec3d(0,0,0) ; 
 
 
         //distCoeffs = cv::Mat(5, 1, CV_64F, distCoeffs_array);
