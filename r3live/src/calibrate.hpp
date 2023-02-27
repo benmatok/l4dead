@@ -95,8 +95,7 @@ class Calibrate
      double time_diff_static ;
    cv::Vec3d i2c_rot ; 
     cv::Vec3d i2c_trans ; 
-    cv::Vec3d a2w_rot  ; 
-    cv::Vec3d a2w_trans  ;  
+    cv::Vec3d cha2w_rot  ;   
      
     
     void img_cbk(const sensor_msgs::ImageConstPtr &msg);
@@ -117,9 +116,9 @@ class Calibrate
     void find_interval(std::vector<std::tuple<double,double>> &intervals  , std::vector<int>  &end_index  );
     void calc_extrinsic();
 
-    void calc_imu_state( double start_time , double end_time ,cv::Vec3d & imu_translation , cv::Mat & imu_rotation)    ;
+    void calc_imu_state( double start_time , double end_time ,cv::Vec3d & imu_translation , cv::Mat & imu_rotation ,cv::Mat &camera2charuco_rotation  )   ;
 
-
+    void calc_res( std::tuple<cv::Vec3d , cv::Vec3d> &first_pose , std::tuple<cv::Vec3d , cv::Vec3d> &last_pose  , cv::Vec3d  &imu_translation ,cv::Vec3d  &imu_rotation,cv::Mat &residual , int i );
 
 
     Calibrate()
