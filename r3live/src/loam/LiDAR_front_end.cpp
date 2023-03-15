@@ -17,7 +17,8 @@ enum LID_TYPE
     MID,
     HORIZON,
     VELO16,
-    OUST64
+    OUST64,
+    L515
 };
 
 enum Feature
@@ -145,9 +146,14 @@ int main( int argc, char **argv )
         sub_points = n.subscribe( "/os_cloud_node/points", 1000, oust64_handler, ros::TransportHints().tcpNoDelay() );
         break;
 
+    case L515:
+        printf( "REALSENSE L515\n ")
+        sub_points = n.subscribe( "/camera/depth/color/points", 1000, mid_handler, ros::TransportHints().tcpNoDelay());
+        break;
     default:
-        printf( "Lidar type is wrong.\n" );
+        printf( "CUSTOM POINT CLOUD DATA.\n" );
         exit( 0 );
+        // sub_points = n.subscribe( "/custom_lidar_points", 1000, custom_handler, ros::TransportHints().tcpNoDelay() );
         break;
     }
 
