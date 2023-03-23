@@ -147,7 +147,7 @@ int main( int argc, char **argv )
         break;
 
     case L515:
-        printf( "REALSENSE L515\n ")
+        printf( "REALSENSE L515\n ");
         sub_points = n.subscribe( "/camera/depth/color/points", 1000, mid_handler, ros::TransportHints().tcpNoDelay());
         break;
     default:
