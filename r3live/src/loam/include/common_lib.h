@@ -336,8 +336,8 @@ public:
         vel_end = vec_3::Zero();
         bias_g = vec_3::Zero();
         bias_a = vec_3::Zero();
-        gravity = Eigen::Vector3d(0.0, 0.0, 9.795);
-        // gravity = Eigen::Vector3d(0.0, 9.795, 0.0);
+        // gravity = Eigen::Vector3d(0.0, 0.0, -9.795);
+        gravity = Eigen::Vector3d(0.0, -9.795, 0.0);
 
         //Ext camera w.r.t. IMU
         rot_ext_i2c = Eigen::Matrix3d::Identity();

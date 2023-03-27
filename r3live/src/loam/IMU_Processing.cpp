@@ -22,7 +22,7 @@ ImuProcess::ImuProcess() : b_first_frame_( true ), imu_need_init_( true ), last_
     init_iter_num = 1;
     cov_acc = Eigen::Vector3d( COV_START_ACC_DIAG, COV_START_ACC_DIAG, COV_START_ACC_DIAG );
     cov_gyr = Eigen::Vector3d( COV_START_GYRO_DIAG, COV_START_GYRO_DIAG, COV_START_GYRO_DIAG );
-    mean_acc = Eigen::Vector3d( 0, 0, -9.795 );
+    mean_acc = Eigen::Vector3d( 0 ,9.795, 0 );
     mean_gyr = Eigen::Vector3d( 0, 0, 0 );
     angvel_last = Zero3d;
     cov_proc_noise = Eigen::Matrix< double, DIM_OF_PROC_N, 1 >::Zero();
@@ -42,7 +42,7 @@ void ImuProcess::Reset()
 
     cov_acc = Eigen::Vector3d( COV_START_ACC_DIAG, COV_START_ACC_DIAG, COV_START_ACC_DIAG );
     cov_gyr = Eigen::Vector3d( COV_START_GYRO_DIAG, COV_START_GYRO_DIAG, COV_START_GYRO_DIAG );
-    mean_acc = Eigen::Vector3d( 0, 0, -9.795 );
+    mean_acc = Eigen::Vector3d( 0, 9.795, 0);
     mean_gyr = Eigen::Vector3d( 0, 0, 0 );
 
     imu_need_init_ = true;
@@ -93,11 +93,11 @@ void ImuProcess::IMU_Initial( const MeasureGroup &meas, StatesGroup &state_inout
     // TODO: fix the cov
     // cov_acc = Eigen::Vector3d( COV_START_ACC_DIAG, COV_START_ACC_DIAG, COV_START_ACC_DIAG );
     // cov_gyr = Eigen::Vector3d( COV_START_GYRO_DIAG, COV_START_GYRO_DIAG, COV_START_GYRO_DIAG );
-    state_inout.gravity = Eigen::Vector3d( 0, 0, 9.795 );
+    state_inout.gravity = Eigen::Vector3d( 0, -9.795, 0 );
     state_inout.rot_end = Eye3d;
     state_inout.bias_g = mean_gyr;
     //FIXME: insert bias through config file, not hard coded
-    state_inout.bias_a = Eigen::Vector3d(0.0127458, 0.0776905,0.010246);
+    // state_inout.bias_a = Eigen::Vector3d(0.0127458, 0.0776905,0.010246);
 }
 
 void ImuProcess::lic_state_propagate( const MeasureGroup &meas, StatesGroup &state_inout )
