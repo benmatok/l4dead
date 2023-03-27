@@ -751,7 +751,8 @@ bool      R3LIVE::vio_esikf( StatesGroup &state_in, Rgbmap_tracker &op_track )
             ( ( H_T_H_spa.toDense() + eigen_mat< -1, -1 >( state_in.cov * m_cam_measurement_weight ).inverse() ).inverse() ).sparseView();
         KH_spa = temp_inv_mat * ( Hsub_T_temp_mat * H_mat_spa );
         solution = ( temp_inv_mat * ( Hsub_T_temp_mat * ( ( -1 * meas_vec.sparseView() ) ) ) - ( I_STATE_spa - KH_spa ) * vec_spa ).toDense();
-
+        Common_tools::normalize_if_large(solution.block<3,1>(9, 0), 0.1);
+        Common_tools::normalize_if_large(solution.block<3,1>(12, 0), 0.1);
         state_iter = state_iter + solution;
 
         if ( fabs( acc_reprojection_error - last_repro_err ) < 0.01 )
@@ -929,6 +930,8 @@ bool R3LIVE::vio_photometric( StatesGroup &state_in, Rgbmap_tracker &op_track, s
             Eigen::SparseMatrix< double > Ht_R_inv = ( Hsub_T_temp_mat * R_mat_inv_spa );
             KH_spa = temp_inv_mat * Ht_R_inv * H_mat_spa;
             solution = ( temp_inv_mat * ( Ht_R_inv * ( ( -1 * meas_vec.sparseView() ) ) ) - ( I_STATE_spa - KH_spa ) * vec_spa ).toDense();
+            Common_tools::normalize_if_large(solution.block<3,1>(9, 0), 0.1);
+            Common_tools::normalize_if_large(solution.block<3,1>(12, 0), 0.1);
         }
         state_iter = state_iter + solution;
 #if DEBUG_PHOTOMETRIC

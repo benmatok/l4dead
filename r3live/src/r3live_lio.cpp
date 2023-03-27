@@ -840,6 +840,8 @@ int R3LIVE::service_LIO_update()
 
                         auto vec = state_propagate - g_lio_state;
                         solution = K * ( meas_vec - Hsub * vec.block< 6, 1 >( 0, 0 ) );
+                        Common_tools::normalize_if_large(solution.block<3,1>(9, 0), 0.1);
+                        Common_tools::normalize_if_large(solution.block<3,1>(12, 0), 0.1);
                         // double speed_delta = solution.block( 0, 6, 3, 1 ).norm();
                         // if(solution.block( 0, 6, 3, 1 ).norm() > 0.05 )
                         // {
