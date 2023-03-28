@@ -419,6 +419,20 @@ public:
         return a;
     }
 
+    StatesGroup normalize_if_large(double val)
+    {
+        StatesGroup a = *this;
+        if ((this->bias_a).norm()>val)
+        {
+            a.bias_a = (this->bias_a).normalized()*val;
+        }
+        if ((this->bias_g).norm()>val)
+        {
+            a.bias_g = (this->bias_g).normalized()*val;
+        }
+        return a;
+    }
+
     static void display(const StatesGroup &state, std::string str = std::string("State: "))
     {
         vec_3 angle_axis = SO3_LOG(state.rot_end) * 57.3;

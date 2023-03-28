@@ -840,8 +840,7 @@ int R3LIVE::service_LIO_update()
 
                         auto vec = state_propagate - g_lio_state;
                         solution = K * ( meas_vec - Hsub * vec.block< 6, 1 >( 0, 0 ) );
-                        Common_tools::normalize_if_large(solution.block<3,1>(9, 0), 0.1);
-                        Common_tools::normalize_if_large(solution.block<3,1>(12, 0), 0.1);
+
                         // double speed_delta = solution.block( 0, 6, 3, 1 ).norm();
                         // if(solution.block( 0, 6, 3, 1 ).norm() > 0.05 )
                         // {
@@ -849,6 +848,7 @@ int R3LIVE::service_LIO_update()
                         // }
 
                         g_lio_state = state_propagate + solution;
+                        g_lio_state=g_lio_state.normalize_if_large(1);
                         print_dash_board();
                         // cout << ANSI_COLOR_RED_BOLD << "Run EKF uph, vec = " << vec.head<9>().transpose() << ANSI_COLOR_RESET << endl;
                         rot_add = solution.block< 3, 1 >( 0, 0 );

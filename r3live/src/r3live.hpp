@@ -82,7 +82,6 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
 #include "lib_sophus/so3.hpp"
 #include "lib_sophus/se3.hpp"
 
-#include "tools_l4d.hpp"
 #include "tools_logger.hpp"
 #include "tools_color_printf.hpp"
 #include "tools_eigen.hpp"
