@@ -769,6 +769,8 @@ bool      R3LIVE::vio_esikf( StatesGroup &state_in, Rgbmap_tracker &op_track )
     state_iter.td_ext_i2c += state_iter.td_ext_i2c_delta;
     state_iter.td_ext_i2c_delta = 0;
     state_in = state_iter;
+    static std::ofstream myfile = std::ofstream("/catkin_ws/src/r3live/data/L515/new_state.txt", ios::app);
+    myfile << state_in.to_string(state_in, "VIO_ESIKF") << "\n";
     return true;
 }
 
@@ -955,6 +957,8 @@ bool R3LIVE::vio_photometric( StatesGroup &state_in, Rgbmap_tracker &op_track, s
     state_iter.td_ext_i2c += state_iter.td_ext_i2c_delta;
     state_iter.td_ext_i2c_delta = 0;
     state_in = state_iter;
+    static std::ofstream myfile = std::ofstream("/catkin_ws/src/r3live/data/L515/new_state.txt", ios::app);
+    myfile << state_in.to_string(state_in,"VIO_PHOTO") << "\n";
     return true;
 }
 

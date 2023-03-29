@@ -93,6 +93,7 @@ int main(int argc, char **argv)
 {
     printf_program("R3LIVE: A Robust, Real-time, RGB-colored, LiDAR-Inertial-Visual tightly-coupled state Estimation and mapping package");
     Common_tools::printf_software_version();
+    static std::ofstream myfile = std::ofstream("/catkin_ws/src/r3live/data/L515/new_state.txt", ios::trunc);
     Eigen::initParallel();
     ros::init(argc, argv, "R3LIVE_main");
     R3LIVE * fast_lio_instance = new R3LIVE();

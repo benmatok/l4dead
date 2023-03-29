@@ -430,19 +430,39 @@ public:
         {
             a.bias_g = (this->bias_g).normalized()*val;
         }
+        if ((this->vel_end).norm()>0.01)
+        {
+            a.vel_end = (this->vel_end).normalized()*0.01;
+        }
         return a;
+    }
+
+    static std::string to_string(const StatesGroup &state, std::string str = std::string("State: "))
+    {
+        vec_3 angle_axis = SO3_LOG(state.rot_end) * 57.3;
+        char state_str[2000];
+        int cx;
+        std::string msg="";
+        snprintf(state_str, 2000, "%s |", str.c_str());
+        msg.append(state_str);
+        snprintf(state_str,2000, "[%.5f] | ", state.last_update_time);
+        msg.append(state_str);
+        snprintf(state_str,2000, "(%.3f, %.3f, %.3f) | ", angle_axis(0), angle_axis(1), angle_axis(2));
+        msg.append(state_str);
+        snprintf(state_str,2000, "(%.3f, %.3f, %.3f) | ", state.pos_end(0), state.pos_end(1), state.pos_end(2));
+        msg.append(state_str);
+        snprintf(state_str,2000, "(%.3f, %.3f, %.3f) | ", state.vel_end(0), state.vel_end(1), state.vel_end(2));
+        msg.append(state_str);
+        snprintf(state_str,2000, "(%.3f, %.3f, %.3f) | ", state.bias_g(0), state.bias_g(1), state.bias_g(2));
+        msg.append(state_str);
+        snprintf(state_str,2000, "(%.3f, %.3f, %.3f) \r\n", state.bias_a(0), state.bias_a(1), state.bias_a(2));
+        msg.append(state_str);
+        return msg;
     }
 
     static void display(const StatesGroup &state, std::string str = std::string("State: "))
     {
-        vec_3 angle_axis = SO3_LOG(state.rot_end) * 57.3;
-        printf("%s |", str.c_str());
-        printf("[%.5f] | ", state.last_update_time);
-        printf("(%.3f, %.3f, %.3f) | ", angle_axis(0), angle_axis(1), angle_axis(2));
-        printf("(%.3f, %.3f, %.3f) | ", state.pos_end(0), state.pos_end(1), state.pos_end(2));
-        printf("(%.3f, %.3f, %.3f) | ", state.vel_end(0), state.vel_end(1), state.vel_end(2));
-        printf("(%.3f, %.3f, %.3f) | ", state.bias_g(0), state.bias_g(1), state.bias_g(2));
-        printf("(%.3f, %.3f, %.3f) \r\n", state.bias_a(0), state.bias_a(1), state.bias_a(2));
+        printf(state.to_string(state, str).c_str());
     }
 };
 

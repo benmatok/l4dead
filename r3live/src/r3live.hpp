@@ -51,6 +51,7 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
 #include <math.h>
 #include <thread>
 #include <fstream>
+#include <iostream>
 #include <csignal>
 #include <unistd.h>
 #include <so3_math.h>

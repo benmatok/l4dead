@@ -44,8 +44,9 @@ r3live_lio:
    fov_degree: 70 # Default value: 360
    lio_update_point_step: 1   # Point step used for LIO update.  
    max_iteration: 2           # Maximum times of LIO esikf.
+   long_rang_pt_dis: 100
    lidar_time_delay: 0        # The time-offset between LiDAR and IMU, provided by user. 
    filter_size_corner: 0.30   
    filter_size_surf: 0.30
    filter_size_surf_z: 0.30
-   filter_size_map: 0.001
+   filter_size_map: 0.01

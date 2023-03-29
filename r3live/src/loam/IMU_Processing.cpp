@@ -97,7 +97,10 @@ void ImuProcess::IMU_Initial( const MeasureGroup &meas, StatesGroup &state_inout
     state_inout.rot_end = Eye3d;
     state_inout.bias_g = mean_gyr;
     //FIXME: insert bias through config file, not hard coded
-    // state_inout.bias_a = Eigen::Vector3d(0.0127458, 0.0776905,0.010246);
+    // state_inout.bias_a = Eigen::Vector3d(0.0127458, 0.0776905,0.010246);'
+    static std::ofstream myfile = std::ofstream("/catkin_ws/src/r3live/data/L515/new_state.txt", std::ios::app);
+
+    myfile << state_inout.to_string(state_inout,"STATE_INI") << std::endl;
 }
 
 void ImuProcess::lic_state_propagate( const MeasureGroup &meas, StatesGroup &state_inout )
