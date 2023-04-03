@@ -57,10 +57,6 @@ static const Eigen::Matrix3d Eye3d(Eigen::Matrix3d::Identity());
 static const Eigen::Matrix3f Eye3f(Eigen::Matrix3f::Identity());
 static const Eigen::Vector3d Zero3d(0, 0, 0);
 static const Eigen::Vector3f Zero3f(0, 0, 0);
-// Eigen::Vector3d Lidar_offset_to_IMU(0.05512, 0.02226, 0.0297); // Horizon
-// static const Eigen::Vector3d Lidar_offset_to_IMU(0.04165, 0.02326, -0.0284); // Avia
-// FIXME: add lidar-imu offset through config file, not hard coded
-static const Eigen::Vector3d Lidar_offset_to_IMU(-0.0124500002712011,0.0164199993014336,0.000569999974686652); // L515
 
 struct Pose6D
 {
@@ -324,6 +320,7 @@ public:
 
     Eigen::Matrix3d rot_ext_i2c;                             // [18-20] Extrinsic between IMU frame to Camera frame on rotation.
     Eigen::Vector3d pos_ext_i2c;                             // [21-23] Extrinsic between IMU frame to Camera frame on position.
+    Eigen::Vector3d pos_ext_i2l;                             // [---] Extrinsic between IMU frame to lidar frame on position (constant, not estimated)
     double          td_ext_i2c_delta;                        // [24]    Extrinsic between IMU frame to Camera frame on position.
     vec_4           cam_intrinsic;                           // [25-28] Intrinsice of camera [fx, fy, cx, cy]
     Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> cov; // states covariance
@@ -336,13 +333,13 @@ public:
         vel_end = vec_3::Zero();
         bias_g = vec_3::Zero();
         bias_a = vec_3::Zero();
-        // gravity = Eigen::Vector3d(0.0, 0.0, -9.795);
-        gravity = Eigen::Vector3d(0.0, -9.795, 0.0);
+        gravity = Eigen::Vector3d(0.0, 0.0, 9.795);
 
         //Ext camera w.r.t. IMU
         rot_ext_i2c = Eigen::Matrix3d::Identity();
         pos_ext_i2c = vec_3::Zero();
-
+        //TODO: use this instead of the m_lidar_ext_t variable used in IMU Process
+        pos_ext_i2l = vec_3::Zero();
         cov = Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES>::Identity() * INIT_COV;
         // cov.block(18, 18, 6,6) *= 0.1;
         last_update_time = 0;

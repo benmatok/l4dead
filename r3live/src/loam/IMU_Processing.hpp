@@ -40,7 +40,7 @@ class ImuProcess
   ImuProcess();
   ~ImuProcess();
 
-  void Process(const MeasureGroup &meas, StatesGroup &state, PointCloudXYZINormal::Ptr pcl_un_);
+  void Process(const MeasureGroup &meas, StatesGroup &state, PointCloudXYZINormal::Ptr pcl_un_, Eigen::Vector3d m_lidar_ext_t);
   void Reset();
   void IMU_Initial(const MeasureGroup &meas, StatesGroup &state, int &N);
 
@@ -50,7 +50,7 @@ class ImuProcess
 
   void UndistortPcl(const MeasureGroup &meas, StatesGroup &state_inout, PointCloudXYZINormal &pcl_in_out);
   void lic_state_propagate(const MeasureGroup &meas, StatesGroup &state_inout);
-  void lic_point_cloud_undistort(const MeasureGroup &meas,  const StatesGroup &state_inout, PointCloudXYZINormal &pcl_out);
+  void lic_point_cloud_undistort(const MeasureGroup &meas,  const StatesGroup &state_inout, PointCloudXYZINormal &pcl_out, Eigen::Vector3d m_lidar_ext_t);
   StatesGroup imu_preintegration(const StatesGroup & state_inout, std::deque<sensor_msgs::Imu::ConstPtr> & v_imu,  double end_pose_dt = 0);
   ros::NodeHandle nh;
 

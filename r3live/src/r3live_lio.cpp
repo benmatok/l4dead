@@ -63,6 +63,23 @@ void R3LIVE::imu_cbk( const sensor_msgs::Imu::ConstPtr &msg_in )
 
     last_timestamp_imu = timestamp;
 
+    // Realsense L515 lidar receives IMU data in optical (image) reference frame Needs to be corrected
+    if (m_lidar_type == L515)
+    {
+        double temp_ax = msg->linear_acceleration.x;
+        double temp_ay = msg->linear_acceleration.y;
+        double temp_az = msg->linear_acceleration.z;
+        double temp_gx = msg->angular_velocity.x;
+        double temp_gy = msg->angular_velocity.y;
+        double temp_gz = msg->angular_velocity.z;
+        msg->linear_acceleration.x=temp_az;
+        msg->linear_acceleration.y=-temp_ax;
+        msg->linear_acceleration.z=-temp_ay;
+        msg->angular_velocity.x=temp_gz;
+        msg->angular_velocity.y=-temp_gx;
+        msg->angular_velocity.z=-temp_gy;
+    }
+
     if ( g_camera_lidar_queue.m_if_acc_mul_G )
     {
         msg->linear_acceleration.x *= G_m_s2;
@@ -228,7 +245,7 @@ bool R3LIVE::sync_packages( MeasureGroup &meas )
 void R3LIVE::pointBodyToWorld( PointType const *const pi, PointType *const po )
 {
     Eigen::Vector3d p_body( pi->x, pi->y, pi->z );
-    Eigen::Vector3d p_global( g_lio_state.rot_end * ( p_body + Lidar_offset_to_IMU ) + g_lio_state.pos_end );
+    Eigen::Vector3d p_global( g_lio_state.rot_end * ( p_body + m_lidar_ext_t ) + g_lio_state.pos_end );
 
     po->x = p_global( 0 );
     po->y = p_global( 1 );
@@ -239,7 +256,7 @@ void R3LIVE::pointBodyToWorld( PointType const *const pi, PointType *const po )
 void R3LIVE::RGBpointBodyToWorld( PointType const *const pi, pcl::PointXYZI *const po )
 {
     Eigen::Vector3d p_body( pi->x, pi->y, pi->z );
-    Eigen::Vector3d p_global( g_lio_state.rot_end * ( p_body + Lidar_offset_to_IMU ) + g_lio_state.pos_end );
+    Eigen::Vector3d p_global( g_lio_state.rot_end * ( p_body + m_lidar_ext_t ) + g_lio_state.pos_end );
 
     po->x = p_global( 0 );
     po->y = p_global( 1 );
@@ -594,7 +611,7 @@ int R3LIVE::service_LIO_update()
             pca_time = 0;
             svd_time = 0;
             t0 = omp_get_wtime();
-            p_imu->Process( Measures, g_lio_state, feats_undistort );
+            p_imu->Process( Measures, g_lio_state, feats_undistort, m_lidar_ext_t);
 
             g_camera_lidar_queue.g_noise_cov_acc = p_imu->cov_acc;
             g_camera_lidar_queue.g_noise_cov_gyro = p_imu->cov_gyr;
@@ -830,7 +847,7 @@ int R3LIVE::service_LIO_update()
                     {
                         const PointType &laser_p = laserCloudOri->points[ i ];
                         Eigen::Vector3d  point_this( laser_p.x, laser_p.y, laser_p.z );
-                        point_this += Lidar_offset_to_IMU;
+                        point_this += m_lidar_ext_t;
                         Eigen::Matrix3d point_crossmat;
                         point_crossmat << SKEW_SYM_MATRIX( point_this );
 

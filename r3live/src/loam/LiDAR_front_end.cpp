@@ -456,9 +456,18 @@ void give_feature( pcl::PointCloud< BasicPointType > &pl, vector< orgtype > &typ
     {
         if ( types[ i ].range > blind )
         {
-            ap.x = pl[ i ].x;
-            ap.y = pl[ i ].y;
-            ap.z = pl[ i ].z;
+            if (lidar_type==L515)
+            {
+                ap.x = pl[ i ].z;
+                ap.y = -pl[ i ].x;
+                ap.z = -pl[ i ].y;
+            }
+            else
+            {
+                ap.x = pl[ i ].x;
+                ap.y = pl[ i ].y;
+                ap.z = pl[ i ].z;
+            }
             // ap.curvature = pl[ i ].curvature;
             pl_surf.push_back( ap );
         }
