@@ -2,7 +2,7 @@ Lidar_front_end:
    lidar_type: 4 # 1 for Livox-avia, 3 for Ouster-OS1-64, 4 for Intel-Realsense-L515
    N_SCANS: 6 # used only if lidar_type is Livox-avia
    using_raw_point: 1
-   point_step: 1
+   point_step: 5
    # group_size: 1
    
 r3live_common:
@@ -42,7 +42,7 @@ r3live_vio:
    
 r3live_lio:        
    fov_degree: 70 # Default value: 360
-   lio_update_point_step: 1   # Point step used for LIO update.  
+   lio_update_point_step: 4   # Point step used for LIO update.  
    max_iteration: 2           # Maximum times of LIO esikf.
    long_rang_pt_dis: 100
    lidar_time_delay: 0        # The time-offset between LiDAR and IMU, provided by user. 

@@ -73,18 +73,16 @@ struct Pose6D
     data_type gyr[3];
 };
 
-template <typename T = double>
-inline Eigen::Matrix<T, 3, 3> vec_to_hat(Eigen::Matrix<T, 3, 1> &omega)
+template < typename T = double >
+inline Eigen::Matrix<T, 3, 3> rotation_between_vecs(const Eigen::Matrix< T, 3, 1 > & src, const Eigen::Matrix< T, 3, 1 > & dst)
 {
-    Eigen::Matrix<T, 3, 3> res_mat_33;
-    res_mat_33.setZero();
-    res_mat_33(0, 1) = -omega(2);
-    res_mat_33(1, 0) = omega(2);
-    res_mat_33(0, 2) = omega(1);
-    res_mat_33(2, 0) = -omega(1);
-    res_mat_33(1, 2) = -omega(0);
-    res_mat_33(2, 1) = omega(0);
-    return res_mat_33;
+    Eigen::Vector3d dst_normed = dst.normalized();
+    Eigen::Vector3d src_normed = src.normalized();
+    Eigen::Vector3d src_dst_c = src_normed.cross(dst_normed);
+    T src_dst_d = src_normed.dot(dst_normed);
+    Eigen::Matrix<T, 3, 3> src_dst_m;
+    src_dst_m << SKEW_SYM_MATRIX(src_dst_c);
+    return Eye3d + src_dst_m + src_dst_m*src_dst_m/(1.0+src_dst_d);
 }
 
 template < typename T = double > 
@@ -103,7 +101,8 @@ inline Eigen::Matrix< T, 3, 3 > right_jacobian_of_rotion_matrix(const Eigen::Mat
     if(std::isnan(theta) || theta == 0)
         return Eigen::Matrix< T, 3, 3>::Identity();
     Eigen::Matrix< T, 3, 1 > a = omega/ theta;
-    Eigen::Matrix< T, 3, 3 > hat_a = vec_to_hat(a);
+    Eigen::Matrix< T, 3, 3 > hat_a;
+    hat_a << SKEW_SYM_MATRIX(a);
     res_mat_33 = sin(theta)/theta * Eigen::Matrix< T, 3, 3 >::Identity()
                     + (1 - (sin(theta)/theta))*a*a.transpose() 
                     + ((1 - cos(theta))/theta)*hat_a;
@@ -122,7 +121,8 @@ Eigen::Matrix< T, 3, 3 > inverse_right_jacobian_of_rotion_matrix(const Eigen::Ma
     if(std::isnan(theta) || theta == 0)
         return Eigen::Matrix< T, 3, 3>::Identity();
     Eigen::Matrix< T, 3, 1 > a = omega/ theta;
-    Eigen::Matrix< T, 3, 3 > hat_a = vec_to_hat(a);
+    Eigen::Matrix< T, 3, 3 > hat_a;
+    hat_a << SKEW_SYM_MATRIX(a);
     res_mat_33 = (theta / 2) * (cot(theta / 2)) * Eigen::Matrix<T, 3, 3>::Identity() 
                 + (1 - (theta / 2) * (cot(theta / 2))) * a * a.transpose() 
                 + (theta / 2) * hat_a;
@@ -430,10 +430,10 @@ public:
         {
             a.bias_g = (this->bias_g).normalized()*val;
         }
-        if ((this->vel_end).norm()>0.01)
-        {
-            a.vel_end = (this->vel_end).normalized()*0.01;
-        }
+        // if ((this->vel_end).norm()>0.01)
+        // {
+        //     a.vel_end = (this->vel_end).normalized()*0.01;
+        // }
         return a;
     }
 
@@ -456,6 +456,8 @@ public:
         snprintf(state_str,2000, "(%.3f, %.3f, %.3f) | ", state.bias_g(0), state.bias_g(1), state.bias_g(2));
         msg.append(state_str);
         snprintf(state_str,2000, "(%.3f, %.3f, %.3f) \r\n", state.bias_a(0), state.bias_a(1), state.bias_a(2));
+        msg.append(state_str);
+        snprintf(state_str,2000, "(%.3f, %.3f, %.3f) \r\n", state.gravity(0), state.gravity(1), state.gravity(2));
         msg.append(state_str);
         return msg;
     }

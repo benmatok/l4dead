@@ -94,8 +94,12 @@ void ImuProcess::IMU_Initial( const MeasureGroup &meas, StatesGroup &state_inout
     // cov_acc = Eigen::Vector3d( COV_START_ACC_DIAG, COV_START_ACC_DIAG, COV_START_ACC_DIAG );
     // cov_gyr = Eigen::Vector3d( COV_START_GYRO_DIAG, COV_START_GYRO_DIAG, COV_START_GYRO_DIAG );
     state_inout.gravity = Eigen::Vector3d( 0, -9.795, 0 );
-    state_inout.rot_end = Eye3d;
+    // state_inout.rot_end = Eye3d;
     state_inout.bias_g = mean_gyr;
+
+    // calculate initial orientation based on max acceleration vector
+    state_inout.rot_end = rotation_between_vecs(mean_acc, state_inout.gravity);
+
     //FIXME: insert bias through config file, not hard coded
     // state_inout.bias_a = Eigen::Vector3d(0.0127458, 0.0776905,0.010246);'
     static std::ofstream myfile = std::ofstream("/catkin_ws/src/r3live/data/L515/new_state.txt", std::ios::app);
