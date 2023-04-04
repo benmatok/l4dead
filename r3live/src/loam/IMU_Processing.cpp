@@ -313,7 +313,7 @@ StatesGroup ImuProcess::imu_preintegration( const StatesGroup &state_in, std::de
     return state_inout;
 }
 
-void ImuProcess::lic_point_cloud_undistort( const MeasureGroup &meas, const StatesGroup &_state_inout, PointCloudXYZINormal &pcl_out, Eigen::Vector3d m_lidar_ext_t )
+void ImuProcess::lic_point_cloud_undistort( const MeasureGroup &meas, const StatesGroup &_state_inout, PointCloudXYZINormal &pcl_out)
 {
     StatesGroup state_inout = _state_inout;
     auto        v_imu = meas.imu;
@@ -391,7 +391,7 @@ void ImuProcess::lic_point_cloud_undistort( const MeasureGroup &meas, const Stat
     state_inout.rot_end = R_imu * Exp( angvel_avr, dt );
     state_inout.pos_end = pos_imu + vel_imu * dt + 0.5 * acc_imu * dt * dt;
 
-    Eigen::Vector3d pos_liD_e = state_inout.pos_end + state_inout.rot_end * m_lidar_ext_t;
+    Eigen::Vector3d pos_liD_e = state_inout.pos_end + state_inout.rot_end * state_inout.pos_ext_i2l;
     // auto R_liD_e   = state_inout.rot_end * Lidar_R_to_IMU;
 
 #ifdef DEBUG_PRINT
@@ -421,7 +421,7 @@ void ImuProcess::lic_point_cloud_undistort( const MeasureGroup &meas, const Stat
              * So if we want to compensate a point at timestamp-i to the frame-e
              * P_compensate = R_imu_e ^ T * (R_i * P_i + T_ei) where T_ei is represented in global frame */
             Eigen::Matrix3d R_i( R_imu * Exp( angvel_avr, dt ) );
-            Eigen::Vector3d T_ei( pos_imu + vel_imu * dt + 0.5 * acc_imu * dt * dt + R_i * m_lidar_ext_t - pos_liD_e );
+            Eigen::Vector3d T_ei( pos_imu + vel_imu * dt + 0.5 * acc_imu * dt * dt + R_i * state_inout.pos_ext_i2l - pos_liD_e );
 
             Eigen::Vector3d P_i( it_pcl->x, it_pcl->y, it_pcl->z );
             Eigen::Vector3d P_compensate = state_inout.rot_end.transpose() * ( R_i * P_i + T_ei );
@@ -437,7 +437,7 @@ void ImuProcess::lic_point_cloud_undistort( const MeasureGroup &meas, const Stat
     }
 }
 
-void ImuProcess::Process( const MeasureGroup &meas, StatesGroup &stat, PointCloudXYZINormal::Ptr cur_pcl_un_, Eigen::Vector3d m_lidar_ext_t)
+void ImuProcess::Process( const MeasureGroup &meas, StatesGroup &stat, PointCloudXYZINormal::Ptr cur_pcl_un_)
 {
     // double t1, t2, t3;
     // t1 = omp_get_wtime();
@@ -484,7 +484,7 @@ void ImuProcess::Process( const MeasureGroup &meas, StatesGroup &stat, PointClou
         // FIXME: fix cloud distortion based on config file, not hard coded
         if ( 0 )
         {
-            lic_point_cloud_undistort( meas, stat, *cur_pcl_un_, m_lidar_ext_t);
+            lic_point_cloud_undistort( meas, stat, *cur_pcl_un_);
         }
         else
         {

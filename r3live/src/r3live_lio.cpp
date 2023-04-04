@@ -245,7 +245,7 @@ bool R3LIVE::sync_packages( MeasureGroup &meas )
 void R3LIVE::pointBodyToWorld( PointType const *const pi, PointType *const po )
 {
     Eigen::Vector3d p_body( pi->x, pi->y, pi->z );
-    Eigen::Vector3d p_global( g_lio_state.rot_end * ( p_body + m_lidar_ext_t ) + g_lio_state.pos_end );
+    Eigen::Vector3d p_global( g_lio_state.rot_end * ( p_body + g_lio_state.pos_ext_i2l ) + g_lio_state.pos_end );
 
     po->x = p_global( 0 );
     po->y = p_global( 1 );
@@ -256,7 +256,7 @@ void R3LIVE::pointBodyToWorld( PointType const *const pi, PointType *const po )
 void R3LIVE::RGBpointBodyToWorld( PointType const *const pi, pcl::PointXYZI *const po )
 {
     Eigen::Vector3d p_body( pi->x, pi->y, pi->z );
-    Eigen::Vector3d p_global( g_lio_state.rot_end * ( p_body + m_lidar_ext_t ) + g_lio_state.pos_end );
+    Eigen::Vector3d p_global( g_lio_state.rot_end * ( p_body + g_lio_state.pos_ext_i2l ) + g_lio_state.pos_end );
 
     po->x = p_global( 0 );
     po->y = p_global( 1 );
@@ -611,7 +611,7 @@ int R3LIVE::service_LIO_update()
             pca_time = 0;
             svd_time = 0;
             t0 = omp_get_wtime();
-            p_imu->Process( Measures, g_lio_state, feats_undistort, m_lidar_ext_t);
+            p_imu->Process( Measures, g_lio_state, feats_undistort);
 
             g_camera_lidar_queue.g_noise_cov_acc = p_imu->cov_acc;
             g_camera_lidar_queue.g_noise_cov_gyro = p_imu->cov_gyr;
@@ -847,7 +847,7 @@ int R3LIVE::service_LIO_update()
                     {
                         const PointType &laser_p = laserCloudOri->points[ i ];
                         Eigen::Vector3d  point_this( laser_p.x, laser_p.y, laser_p.z );
-                        point_this += m_lidar_ext_t;
+                        point_this += g_lio_state.pos_ext_i2l;
                         Eigen::Matrix3d point_crossmat;
                         point_crossmat << SKEW_SYM_MATRIX( point_this );
 

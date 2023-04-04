@@ -338,7 +338,7 @@ public:
         //Ext camera w.r.t. IMU
         rot_ext_i2c = Eigen::Matrix3d::Identity();
         pos_ext_i2c = vec_3::Zero();
-        //TODO: use this instead of the m_lidar_ext_t variable used in IMU Process
+        //Ext lidar w.r.t. IMU
         pos_ext_i2l = vec_3::Zero();
         cov = Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES>::Identity() * INIT_COV;
         // cov.block(18, 18, 6,6) *= 0.1;

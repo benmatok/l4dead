@@ -267,8 +267,6 @@ public:
     double m_control_image_freq =  100; 
     int m_maximum_vio_tracked_pts = 300;
     int m_lio_update_point_step = 1;
-    // TODO: remove this variable in the future to use it in the StatesGroup instead.
-    Eigen::Vector3d m_lidar_ext_t = Eigen::Vector3d(0.0,0.0,0.0);
     int m_append_global_map_point_step = 1;
     int m_pub_pt_minimum_views = 5;
     double m_recent_visited_voxel_activated_time = 0.0;
@@ -406,8 +404,7 @@ public:
             get_ros_parameter( m_ros_node_handle, "r3live_lio/lio_update_point_step", m_lio_update_point_step, 1 );
             std::vector< double > lidar_ext_t_data;
             m_ros_node_handle.getParam( "r3live_lio/lidar_ext_t", lidar_ext_t_data );
-            //TODO: in the future insert this vector to the StatesGroup as a property
-            m_lidar_ext_t = Eigen::Map< Eigen::Matrix< double, 3, 1 > >( lidar_ext_t_data.data() );
+            g_lio_state.pos_ext_i2l = Eigen::Map< Eigen::Matrix< double, 3, 1 > >( lidar_ext_t_data.data() );
         }
         if ( 1 )
         {
@@ -453,7 +450,7 @@ public:
     void pointBodyToWorld(const Eigen::Matrix<T, 3, 1> &pi, Eigen::Matrix<T, 3, 1> &po)
     {
         Eigen::Vector3d p_body(pi[0], pi[1], pi[2]);
-        Eigen::Vector3d p_global(g_lio_state.rot_end * (p_body + m_lidar_ext_t) + g_lio_state.pos_end);
+        Eigen::Vector3d p_global(g_lio_state.rot_end * (p_body + g_lio_state.pos_ext_i2l) + g_lio_state.pos_end);
         po[0] = p_global(0);
         po[1] = p_global(1);
         po[2] = p_global(2);
