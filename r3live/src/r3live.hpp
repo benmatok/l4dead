@@ -405,6 +405,9 @@ public:
             std::vector< double > lidar_ext_t_data;
             m_ros_node_handle.getParam( "r3live_lio/lidar_ext_t", lidar_ext_t_data );
             g_lio_state.pos_ext_i2l = Eigen::Map< Eigen::Matrix< double, 3, 1 > >( lidar_ext_t_data.data() );
+            int lidar_undistort;
+            m_ros_node_handle.getParam( "r3live_lio/lidar_undistort", lidar_undistort );
+            g_lio_state.lidar_undistort = lidar_undistort;
         }
         if ( 1 )
         {

@@ -326,6 +326,7 @@ public:
     Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> cov; // states covariance
     double last_update_time = 0;
     double          td_ext_i2c;
+    bool lidar_undistort=false;
     StatesGroup()
     {
         rot_end = Eigen::Matrix3d::Identity();

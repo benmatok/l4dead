@@ -482,7 +482,7 @@ void ImuProcess::Process( const MeasureGroup &meas, StatesGroup &stat, PointClou
     else
     {
         // FIXME: fix cloud distortion based on config file, not hard coded
-        if ( 0 )
+        if ( stat.lidar_undistort )
         {
             lic_point_cloud_undistort( meas, stat, *cur_pcl_un_);
         }
