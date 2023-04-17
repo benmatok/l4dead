@@ -1249,8 +1249,8 @@ void R3LIVE::service_VIO_update()
         g_vio_frame_cost_time = display_cost_time;
         // publish_render_pts( m_pub_render_rgb_pts, m_map_rgb_pts );
         publish_camera_odom( img_pose, message_time );
-        // publish_track_img( op_track.m_debug_track_img, display_cost_time );
-        publish_track_img( img_pose->m_raw_img, display_cost_time );
+        publish_track_img( op_track.m_debug_track_img, display_cost_time );
+        // publish_track_img( img_pose->m_raw_img, display_cost_time );
 
         if ( m_if_pub_raw_img )
         {

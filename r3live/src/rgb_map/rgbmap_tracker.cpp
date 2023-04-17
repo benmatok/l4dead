@@ -288,6 +288,13 @@ void Rgbmap_tracker::track_img( std::shared_ptr< Image_frame > &img_pose, double
     }
 
     m_old_gray = frame_gray.clone();
+    //draw debug image with currently tracked points
+    cv::cvtColor(frame_gray, m_debug_track_img, cv::COLOR_GRAY2BGR);
+    for ( uint i = 0; i < m_current_tracked_pts.size(); i++ )
+    {
+        cv::circle(m_debug_track_img, m_current_tracked_pts[i],3, cv::Scalar(0,0,255));
+    }
+
     m_old_frame = m_current_frame;
     m_map_rgb_pts_in_last_frame_pos = m_map_rgb_pts_in_current_frame_pos;
     update_last_tracking_vector_and_ids();
