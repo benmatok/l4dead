@@ -348,14 +348,13 @@ void R3LIVE::image_callback( const sensor_msgs::ImageConstPtr &msg )
     }
     sub_image_typed = 1;
 
+    g_received_img_msg.push_back(msg);
     if ( g_flag_if_first_rec_img )
     {
         g_flag_if_first_rec_img = 0;
         m_thread_pool_ptr->commit_task( &R3LIVE::service_process_img_buffer, this );
     }
-
-    cv::Mat temp_img = cv_bridge::toCvCopy( msg, sensor_msgs::image_encodings::BGR8 )->image.clone();
-    process_image( temp_img, msg->header.stamp.toSec() );
+    return;
 }
 
 double last_accept_time = 0;
@@ -416,7 +415,7 @@ void   R3LIVE::process_image( cv::Mat &temp_img, double msg_time )
     // cv::imshow("sub Img", img_pose->m_img);
     img_pose->m_timestamp = msg_time;
     img_pose->init_cubic_interpolation();
-    img_pose->image_equalize();
+    // img_pose->image_equalize();
     m_camera_data_mutex.lock();
     m_queue_image_with_pose.push_back( img_pose );
     m_camera_data_mutex.unlock();
