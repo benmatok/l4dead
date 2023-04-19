@@ -9,6 +9,7 @@ using namespace std;
 #define IS_VALID( a ) ( ( abs( a ) > 1e8 ) ? true : false )
 
 typedef pcl::PointXYZINormal PointType;
+typedef pcl::PointXYZI BasicPointType;
 
 ros::Publisher pub_full, pub_surf, pub_corn;
 
@@ -17,7 +18,8 @@ enum LID_TYPE
     MID,
     HORIZON,
     VELO16,
-    OUST64
+    OUST64,
+    L515
 };
 
 enum Feature
@@ -78,13 +80,18 @@ double smallp_intersect, smallp_ratio;
 int    point_filter_num;
 int    g_if_using_raw_point = 1;
 int    g_LiDAR_sampling_point_step = 3;
+void   l515_handler( const sensor_msgs::PointCloud2::ConstPtr &msg );
 void   mid_handler( const sensor_msgs::PointCloud2::ConstPtr &msg );
 void   horizon_handler( const livox_ros_driver::CustomMsg::ConstPtr &msg );
 void   velo16_handler( const sensor_msgs::PointCloud2::ConstPtr &msg );
 void   oust64_handler( const sensor_msgs::PointCloud2::ConstPtr &msg );
 void   give_feature( pcl::PointCloud< PointType > &pl, vector< orgtype > &types, pcl::PointCloud< PointType > &pl_corn,
                      pcl::PointCloud< PointType > &pl_surf );
+void   give_feature( pcl::PointCloud< BasicPointType > &pl, vector< orgtype > &types, pcl::PointCloud< BasicPointType > &pl_corn,
+                     pcl::PointCloud< BasicPointType > &pl_surf );
 void   pub_func( pcl::PointCloud< PointType > &pl, ros::Publisher pub, const ros::Time &ct );
+void   pub_func( pcl::PointCloud< BasicPointType > &pl, ros::Publisher pub, const ros::Time &ct );
+
 int    plane_judge( const pcl::PointCloud< PointType > &pl, vector< orgtype > &types, uint i, uint &i_nex, Eigen::Vector3d &curr_direct );
 bool   small_plane( const pcl::PointCloud< PointType > &pl, vector< orgtype > &types, uint i_cur, uint &i_nex, Eigen::Vector3d &curr_direct );
 bool   edge_jump_judge( const pcl::PointCloud< PointType > &pl, vector< orgtype > &types, uint i, Surround nor_dir );
@@ -145,9 +152,14 @@ int main( int argc, char **argv )
         sub_points = n.subscribe( "/os_cloud_node/points", 1000, oust64_handler, ros::TransportHints().tcpNoDelay() );
         break;
 
+    case L515:
+        printf( "REALSENSE L515\n ");
+        sub_points = n.subscribe( "/camera/depth/color/points", 1000, l515_handler, ros::TransportHints().tcpNoDelay());
+        break;
     default:
-        printf( "Lidar type is wrong.\n" );
+        printf( "CUSTOM POINT CLOUD DATA.\n" );
         exit( 0 );
+        // sub_points = n.subscribe( "/custom_lidar_points", 1000, custom_handler, ros::TransportHints().tcpNoDelay() );
         break;
     }
 
@@ -166,6 +178,37 @@ void   mid_handler( const sensor_msgs::PointCloud2::ConstPtr &msg )
     pcl::fromROSMsg( *msg, pl );
 
     pcl::PointCloud< PointType > pl_corn, pl_surf;
+    vector< orgtype >            types;
+    uint                         plsize = pl.size() - 1;
+    pl_corn.reserve( plsize );
+    pl_surf.reserve( plsize );
+    types.resize( plsize + 1 );
+
+    for ( uint i = 0; i < plsize; i++ )
+    {
+        types[ i ].range = pl[ i ].x;
+        vx = pl[ i ].x - pl[ i + 1 ].x;
+        vy = pl[ i ].y - pl[ i + 1 ].y;
+        vz = pl[ i ].z - pl[ i + 1 ].z;
+        types[ i ].dista = vx * vx + vy * vy + vz * vz;
+    }
+    // plsize++;
+    types[ plsize ].range = sqrt( pl[ plsize ].x * pl[ plsize ].x + pl[ plsize ].y * pl[ plsize ].y );
+
+    give_feature( pl, types, pl_corn, pl_surf );
+
+    ros::Time ct( ros::Time::now() );
+    pub_func( pl, pub_full, msg->header.stamp );
+    pub_func( pl_surf, pub_surf, msg->header.stamp );
+    pub_func( pl_corn, pub_corn, msg->header.stamp );
+}
+
+void   l515_handler( const sensor_msgs::PointCloud2::ConstPtr &msg )
+{
+    pcl::PointCloud< BasicPointType > pl;
+    pcl::fromROSMsg( *msg, pl );
+
+    pcl::PointCloud< BasicPointType > pl_corn, pl_surf;
     vector< orgtype >            types;
     uint                         plsize = pl.size() - 1;
     pl_corn.reserve( plsize );
@@ -380,6 +423,56 @@ void oust64_handler(const sensor_msgs::PointCloud2::ConstPtr &msg)
     pub_func( pl_processed, pub_corn, msg->header.stamp );
 }
 
+void give_feature( pcl::PointCloud< BasicPointType > &pl, vector< orgtype > &types, pcl::PointCloud< BasicPointType > &pl_corn,
+                   pcl::PointCloud< BasicPointType > &pl_surf )
+{
+    uint plsize = pl.size();
+    uint plsize2;
+    if ( plsize == 0 )
+    {
+        printf( "something wrong\n" );
+        return;
+    }
+    uint head = 0;
+    while ( types[ head ].range < blind )
+    {
+        head++;
+    }
+
+    // Surf
+    plsize2 = ( plsize > group_size ) ? ( plsize - group_size ) : 0;
+
+    Eigen::Vector3d curr_direct( Eigen::Vector3d::Zero() );
+    Eigen::Vector3d last_direct( Eigen::Vector3d::Zero() );
+
+    uint i_nex = 0, i2;
+    uint last_i = 0;
+    uint last_i_nex = 0;
+    int  last_state = 0;
+    int  plane_type;
+
+    BasicPointType ap;
+    for ( uint i = head; i < plsize2; i += g_LiDAR_sampling_point_step )
+    {
+        if ( types[ i ].range > blind )
+        {
+            if (lidar_type==L515)
+            {
+                ap.x = pl[ i ].z;
+                ap.y = -pl[ i ].x;
+                ap.z = -pl[ i ].y;
+            }
+            else
+            {
+                ap.x = pl[ i ].x;
+                ap.y = pl[ i ].y;
+                ap.z = pl[ i ].z;
+            }
+            // ap.curvature = pl[ i ].curvature;
+            pl_surf.push_back( ap );
+        }
+    }
+}
 
 void give_feature( pcl::PointCloud< PointType > &pl, vector< orgtype > &types, pcl::PointCloud< PointType > &pl_corn,
                    pcl::PointCloud< PointType > &pl_surf )
@@ -704,6 +797,17 @@ void give_feature( pcl::PointCloud< PointType > &pl, vector< orgtype > &types, p
             last_surface = -1;
         }
     }
+}
+
+void pub_func( pcl::PointCloud< BasicPointType > &pl, ros::Publisher pub, const ros::Time &ct )
+{
+    pl.height = 1;
+    pl.width = pl.size();
+    sensor_msgs::PointCloud2 output;
+    pcl::toROSMsg( pl, output );
+    output.header.frame_id = "livox";
+    output.header.stamp = ct;
+    pub.publish( output );
 }
 
 void pub_func( pcl::PointCloud< PointType > &pl, ros::Publisher pub, const ros::Time &ct )

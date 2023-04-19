@@ -26,7 +26,7 @@
 #include <geometry_msgs/Vector3.h>
 
 /// *************Preconfiguration
-#define MAX_INI_COUNT (20)
+#define MAX_INI_COUNT (300)
 const inline bool time_list(PointType &x, PointType &y) {return (x.curvature < y.curvature);};
 bool check_state(StatesGroup &state_inout);
 void check_in_out_state(const StatesGroup &state_in, StatesGroup &state_inout);

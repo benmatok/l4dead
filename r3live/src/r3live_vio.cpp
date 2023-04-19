@@ -348,14 +348,13 @@ void R3LIVE::image_callback( const sensor_msgs::ImageConstPtr &msg )
     }
     sub_image_typed = 1;
 
+    g_received_img_msg.push_back(msg);
     if ( g_flag_if_first_rec_img )
     {
         g_flag_if_first_rec_img = 0;
         m_thread_pool_ptr->commit_task( &R3LIVE::service_process_img_buffer, this );
     }
-
-    cv::Mat temp_img = cv_bridge::toCvCopy( msg, sensor_msgs::image_encodings::BGR8 )->image.clone();
-    process_image( temp_img, msg->header.stamp.toSec() );
+    return;
 }
 
 double last_accept_time = 0;
@@ -416,7 +415,7 @@ void   R3LIVE::process_image( cv::Mat &temp_img, double msg_time )
     // cv::imshow("sub Img", img_pose->m_img);
     img_pose->m_timestamp = msg_time;
     img_pose->init_cubic_interpolation();
-    img_pose->image_equalize();
+    // img_pose->image_equalize();
     m_camera_data_mutex.lock();
     m_queue_image_with_pose.push_back( img_pose );
     m_camera_data_mutex.unlock();
@@ -751,8 +750,8 @@ bool      R3LIVE::vio_esikf( StatesGroup &state_in, Rgbmap_tracker &op_track )
             ( ( H_T_H_spa.toDense() + eigen_mat< -1, -1 >( state_in.cov * m_cam_measurement_weight ).inverse() ).inverse() ).sparseView();
         KH_spa = temp_inv_mat * ( Hsub_T_temp_mat * H_mat_spa );
         solution = ( temp_inv_mat * ( Hsub_T_temp_mat * ( ( -1 * meas_vec.sparseView() ) ) ) - ( I_STATE_spa - KH_spa ) * vec_spa ).toDense();
-
         state_iter = state_iter + solution;
+        state_iter = state_iter.normalize_if_large(1);
 
         if ( fabs( acc_reprojection_error - last_repro_err ) < 0.01 )
         {
@@ -769,6 +768,8 @@ bool      R3LIVE::vio_esikf( StatesGroup &state_in, Rgbmap_tracker &op_track )
     state_iter.td_ext_i2c += state_iter.td_ext_i2c_delta;
     state_iter.td_ext_i2c_delta = 0;
     state_in = state_iter;
+    static std::ofstream myfile = std::ofstream("/catkin_ws/src/r3live/data/L515/new_state.txt", ios::app);
+    myfile << state_in.to_string(state_in, "VIO_ESIKF") << "\n";
     return true;
 }
 
@@ -929,8 +930,10 @@ bool R3LIVE::vio_photometric( StatesGroup &state_in, Rgbmap_tracker &op_track, s
             Eigen::SparseMatrix< double > Ht_R_inv = ( Hsub_T_temp_mat * R_mat_inv_spa );
             KH_spa = temp_inv_mat * Ht_R_inv * H_mat_spa;
             solution = ( temp_inv_mat * ( Ht_R_inv * ( ( -1 * meas_vec.sparseView() ) ) ) - ( I_STATE_spa - KH_spa ) * vec_spa ).toDense();
+
         }
         state_iter = state_iter + solution;
+        state_iter = state_iter.normalize_if_large(1);
 #if DEBUG_PHOTOMETRIC
         cout << "Average photometric error: " <<  acc_photometric_error / total_pt_size << endl;
         cout << "Solved solution: "<< solution.transpose() << endl;
@@ -953,6 +956,8 @@ bool R3LIVE::vio_photometric( StatesGroup &state_in, Rgbmap_tracker &op_track, s
     state_iter.td_ext_i2c += state_iter.td_ext_i2c_delta;
     state_iter.td_ext_i2c_delta = 0;
     state_in = state_iter;
+    static std::ofstream myfile = std::ofstream("/catkin_ws/src/r3live/data/L515/new_state.txt", ios::app);
+    myfile << state_in.to_string(state_in,"VIO_PHOTO") << "\n";
     return true;
 }
 
@@ -1243,8 +1248,8 @@ void R3LIVE::service_VIO_update()
         g_vio_frame_cost_time = display_cost_time;
         // publish_render_pts( m_pub_render_rgb_pts, m_map_rgb_pts );
         publish_camera_odom( img_pose, message_time );
-        // publish_track_img( op_track.m_debug_track_img, display_cost_time );
-        publish_track_img( img_pose->m_raw_img, display_cost_time );
+        publish_track_img( op_track.m_debug_track_img, display_cost_time );
+        // publish_track_img( img_pose->m_raw_img, display_cost_time );
 
         if ( m_if_pub_raw_img )
         {

@@ -30,7 +30,7 @@
 #define printf_line std::cout << __FILE__ << " " << __LINE__ << std::endl;
 
 #define PI_M (3.14159265358)
-#define G_m_s2 (9.81)     // Gravity const in Hong Kong SAR, China
+#define G_m_s2 (9.795)     // Gravity const in Hong Kong SAR, China
 #if ENABLE_CAMERA_OBS
 #define DIM_OF_STATES (29) // with vio obs
 #else
@@ -57,8 +57,6 @@ static const Eigen::Matrix3d Eye3d(Eigen::Matrix3d::Identity());
 static const Eigen::Matrix3f Eye3f(Eigen::Matrix3f::Identity());
 static const Eigen::Vector3d Zero3d(0, 0, 0);
 static const Eigen::Vector3f Zero3f(0, 0, 0);
-// Eigen::Vector3d Lidar_offset_to_IMU(0.05512, 0.02226, 0.0297); // Horizon
-static const Eigen::Vector3d Lidar_offset_to_IMU(0.04165, 0.02326, -0.0284); // Avia
 
 struct Pose6D
 {
@@ -71,18 +69,16 @@ struct Pose6D
     data_type gyr[3];
 };
 
-template <typename T = double>
-inline Eigen::Matrix<T, 3, 3> vec_to_hat(Eigen::Matrix<T, 3, 1> &omega)
+template < typename T = double >
+inline Eigen::Matrix<T, 3, 3> rotation_between_vecs(const Eigen::Matrix< T, 3, 1 > & src, const Eigen::Matrix< T, 3, 1 > & dst)
 {
-    Eigen::Matrix<T, 3, 3> res_mat_33;
-    res_mat_33.setZero();
-    res_mat_33(0, 1) = -omega(2);
-    res_mat_33(1, 0) = omega(2);
-    res_mat_33(0, 2) = omega(1);
-    res_mat_33(2, 0) = -omega(1);
-    res_mat_33(1, 2) = -omega(0);
-    res_mat_33(2, 1) = omega(0);
-    return res_mat_33;
+    Eigen::Vector3d dst_normed = dst.normalized();
+    Eigen::Vector3d src_normed = src.normalized();
+    Eigen::Vector3d src_dst_c = src_normed.cross(dst_normed);
+    T src_dst_d = src_normed.dot(dst_normed);
+    Eigen::Matrix<T, 3, 3> src_dst_m;
+    src_dst_m << SKEW_SYM_MATRIX(src_dst_c);
+    return Eye3d + src_dst_m + src_dst_m*src_dst_m/(1.0+src_dst_d);
 }
 
 template < typename T = double > 
@@ -101,7 +97,8 @@ inline Eigen::Matrix< T, 3, 3 > right_jacobian_of_rotion_matrix(const Eigen::Mat
     if(std::isnan(theta) || theta == 0)
         return Eigen::Matrix< T, 3, 3>::Identity();
     Eigen::Matrix< T, 3, 1 > a = omega/ theta;
-    Eigen::Matrix< T, 3, 3 > hat_a = vec_to_hat(a);
+    Eigen::Matrix< T, 3, 3 > hat_a;
+    hat_a << SKEW_SYM_MATRIX(a);
     res_mat_33 = sin(theta)/theta * Eigen::Matrix< T, 3, 3 >::Identity()
                     + (1 - (sin(theta)/theta))*a*a.transpose() 
                     + ((1 - cos(theta))/theta)*hat_a;
@@ -120,7 +117,8 @@ Eigen::Matrix< T, 3, 3 > inverse_right_jacobian_of_rotion_matrix(const Eigen::Ma
     if(std::isnan(theta) || theta == 0)
         return Eigen::Matrix< T, 3, 3>::Identity();
     Eigen::Matrix< T, 3, 1 > a = omega/ theta;
-    Eigen::Matrix< T, 3, 3 > hat_a = vec_to_hat(a);
+    Eigen::Matrix< T, 3, 3 > hat_a;
+    hat_a << SKEW_SYM_MATRIX(a);
     res_mat_33 = (theta / 2) * (cot(theta / 2)) * Eigen::Matrix<T, 3, 3>::Identity() 
                 + (1 - (theta / 2) * (cot(theta / 2))) * a * a.transpose() 
                 + (theta / 2) * hat_a;
@@ -322,11 +320,13 @@ public:
 
     Eigen::Matrix3d rot_ext_i2c;                             // [18-20] Extrinsic between IMU frame to Camera frame on rotation.
     Eigen::Vector3d pos_ext_i2c;                             // [21-23] Extrinsic between IMU frame to Camera frame on position.
+    Eigen::Vector3d pos_ext_i2l;                             // [---] Extrinsic between IMU frame to lidar frame on position (constant, not estimated)
     double          td_ext_i2c_delta;                        // [24]    Extrinsic between IMU frame to Camera frame on position.
     vec_4           cam_intrinsic;                           // [25-28] Intrinsice of camera [fx, fy, cx, cy]
     Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> cov; // states covariance
     double last_update_time = 0;
     double          td_ext_i2c;
+    bool lidar_undistort=false;
     StatesGroup()
     {
         rot_end = Eigen::Matrix3d::Identity();
@@ -334,13 +334,13 @@ public:
         vel_end = vec_3::Zero();
         bias_g = vec_3::Zero();
         bias_a = vec_3::Zero();
-        gravity = Eigen::Vector3d(0.0, 0.0, 9.805);
-        // gravity = Eigen::Vector3d(0.0, 9.805, 0.0);
+        gravity = Eigen::Vector3d(0.0, 0.0, 9.795);
 
         //Ext camera w.r.t. IMU
         rot_ext_i2c = Eigen::Matrix3d::Identity();
         pos_ext_i2c = vec_3::Zero();
-
+        //Ext lidar w.r.t. IMU
+        pos_ext_i2l = vec_3::Zero();
         cov = Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES>::Identity() * INIT_COV;
         // cov.block(18, 18, 6,6) *= 0.1;
         last_update_time = 0;
@@ -417,16 +417,52 @@ public:
         return a;
     }
 
-    static void display(const StatesGroup &state, std::string str = std::string("State: "))
+    StatesGroup normalize_if_large(double val)
+    {
+        StatesGroup a = *this;
+        if ((this->bias_a).norm()>val)
+        {
+            a.bias_a = (this->bias_a).normalized()*val;
+        }
+        if ((this->bias_g).norm()>val)
+        {
+            a.bias_g = (this->bias_g).normalized()*val;
+        }
+        // if ((this->vel_end).norm()>0.01)
+        // {
+        //     a.vel_end = (this->vel_end).normalized()*0.01;
+        // }
+        return a;
+    }
+
+    static std::string to_string(const StatesGroup &state, std::string str = std::string("State: "))
     {
         vec_3 angle_axis = SO3_LOG(state.rot_end) * 57.3;
-        printf("%s |", str.c_str());
-        printf("[%.5f] | ", state.last_update_time);
-        printf("(%.3f, %.3f, %.3f) | ", angle_axis(0), angle_axis(1), angle_axis(2));
-        printf("(%.3f, %.3f, %.3f) | ", state.pos_end(0), state.pos_end(1), state.pos_end(2));
-        printf("(%.3f, %.3f, %.3f) | ", state.vel_end(0), state.vel_end(1), state.vel_end(2));
-        printf("(%.3f, %.3f, %.3f) | ", state.bias_g(0), state.bias_g(1), state.bias_g(2));
-        printf("(%.3f, %.3f, %.3f) \r\n", state.bias_a(0), state.bias_a(1), state.bias_a(2));
+        char state_str[2000];
+        int cx;
+        std::string msg="";
+        snprintf(state_str, 2000, "%s |", str.c_str());
+        msg.append(state_str);
+        snprintf(state_str,2000, "[%.5f] | ", state.last_update_time);
+        msg.append(state_str);
+        snprintf(state_str,2000, "(%.3f, %.3f, %.3f) | ", angle_axis(0), angle_axis(1), angle_axis(2));
+        msg.append(state_str);
+        snprintf(state_str,2000, "(%.3f, %.3f, %.3f) | ", state.pos_end(0), state.pos_end(1), state.pos_end(2));
+        msg.append(state_str);
+        snprintf(state_str,2000, "(%.3f, %.3f, %.3f) | ", state.vel_end(0), state.vel_end(1), state.vel_end(2));
+        msg.append(state_str);
+        snprintf(state_str,2000, "(%.3f, %.3f, %.3f) | ", state.bias_g(0), state.bias_g(1), state.bias_g(2));
+        msg.append(state_str);
+        snprintf(state_str,2000, "(%.3f, %.3f, %.3f) \r\n", state.bias_a(0), state.bias_a(1), state.bias_a(2));
+        msg.append(state_str);
+        snprintf(state_str,2000, "(%.3f, %.3f, %.3f) \r\n", state.gravity(0), state.gravity(1), state.gravity(2));
+        msg.append(state_str);
+        return msg;
+    }
+
+    static void display(const StatesGroup &state, std::string str = std::string("State: "))
+    {
+        printf(state.to_string(state, str).c_str());
     }
 };
 

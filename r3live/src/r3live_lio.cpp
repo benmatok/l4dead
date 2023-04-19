@@ -63,6 +63,23 @@ void R3LIVE::imu_cbk( const sensor_msgs::Imu::ConstPtr &msg_in )
 
     last_timestamp_imu = timestamp;
 
+    // Realsense L515 lidar receives IMU data in optical (image) reference frame Needs to be corrected
+    if (m_lidar_type == L515)
+    {
+        double temp_ax = msg->linear_acceleration.x;
+        double temp_ay = msg->linear_acceleration.y;
+        double temp_az = msg->linear_acceleration.z;
+        double temp_gx = msg->angular_velocity.x;
+        double temp_gy = msg->angular_velocity.y;
+        double temp_gz = msg->angular_velocity.z;
+        msg->linear_acceleration.x=temp_az;
+        msg->linear_acceleration.y=-temp_ax;
+        msg->linear_acceleration.z=-temp_ay;
+        msg->angular_velocity.x=temp_gz;
+        msg->angular_velocity.y=-temp_gx;
+        msg->angular_velocity.z=-temp_gy;
+    }
+
     if ( g_camera_lidar_queue.m_if_acc_mul_G )
     {
         msg->linear_acceleration.x *= G_m_s2;
@@ -138,6 +155,34 @@ bool R3LIVE::get_pointcloud_data_from_ros_message( sensor_msgs::PointCloud2::Con
             pcl_pc.points.resize( pt_count );
             return true;
         }
+        else if (( msg->fields.size() == 4 ) && ( msg->fields[ 3 ].name == "intensity" ))
+        {
+            double maximum_range = 5;
+            get_ros_parameter< double >( m_ros_node_handle, "iros_range", maximum_range, 5 );
+            pcl::PointCloud< pcl::PointXYZI > pcl_i_pc;
+            pcl::fromROSMsg( *msg, pcl_i_pc );
+            double lidar_point_time = msg->header.stamp.toSec();
+            int    pt_count = 0;
+            pcl_pc.resize( pcl_i_pc.points.size() );
+            for ( int i = 0; i < pcl_i_pc.size(); i++ )
+            {
+                pcl::PointXYZINormal temp_pt;
+                temp_pt.x = pcl_i_pc.points[ i ].x;
+                temp_pt.y = pcl_i_pc.points[ i ].y;
+                temp_pt.z = pcl_i_pc.points[ i ].z;
+                double frame_dis = sqrt( temp_pt.x * temp_pt.x + temp_pt.y * temp_pt.y + temp_pt.z * temp_pt.z );
+                if ( frame_dis > maximum_range )
+                {
+                    continue;
+                }
+                temp_pt.intensity = pcl_i_pc.points[ i ].intensity;
+                temp_pt.curvature = 0;
+                pcl_pc.points[ pt_count ] = temp_pt;
+                pt_count++;
+            }
+            pcl_pc.points.resize( pt_count );
+            return true;
+        }
         else // TODO, can add by yourself
         {
             cout << "Get pointcloud data from ros messages fail!!! ";
@@ -200,7 +245,7 @@ bool R3LIVE::sync_packages( MeasureGroup &meas )
 void R3LIVE::pointBodyToWorld( PointType const *const pi, PointType *const po )
 {
     Eigen::Vector3d p_body( pi->x, pi->y, pi->z );
-    Eigen::Vector3d p_global( g_lio_state.rot_end * ( p_body + Lidar_offset_to_IMU ) + g_lio_state.pos_end );
+    Eigen::Vector3d p_global( g_lio_state.rot_end * ( p_body + g_lio_state.pos_ext_i2l ) + g_lio_state.pos_end );
 
     po->x = p_global( 0 );
     po->y = p_global( 1 );
@@ -211,7 +256,7 @@ void R3LIVE::pointBodyToWorld( PointType const *const pi, PointType *const po )
 void R3LIVE::RGBpointBodyToWorld( PointType const *const pi, pcl::PointXYZI *const po )
 {
     Eigen::Vector3d p_body( pi->x, pi->y, pi->z );
-    Eigen::Vector3d p_global( g_lio_state.rot_end * ( p_body + Lidar_offset_to_IMU ) + g_lio_state.pos_end );
+    Eigen::Vector3d p_global( g_lio_state.rot_end * ( p_body + g_lio_state.pos_ext_i2l ) + g_lio_state.pos_end );
 
     po->x = p_global( 0 );
     po->y = p_global( 1 );
@@ -566,7 +611,7 @@ int R3LIVE::service_LIO_update()
             pca_time = 0;
             svd_time = 0;
             t0 = omp_get_wtime();
-            p_imu->Process( Measures, g_lio_state, feats_undistort );
+            p_imu->Process( Measures, g_lio_state, feats_undistort);
 
             g_camera_lidar_queue.g_noise_cov_acc = p_imu->cov_acc;
             g_camera_lidar_queue.g_noise_cov_gyro = p_imu->cov_gyr;
@@ -802,7 +847,7 @@ int R3LIVE::service_LIO_update()
                     {
                         const PointType &laser_p = laserCloudOri->points[ i ];
                         Eigen::Vector3d  point_this( laser_p.x, laser_p.y, laser_p.z );
-                        point_this += Lidar_offset_to_IMU;
+                        point_this += g_lio_state.pos_ext_i2l;
                         Eigen::Matrix3d point_crossmat;
                         point_crossmat << SKEW_SYM_MATRIX( point_this );
 
@@ -840,6 +885,7 @@ int R3LIVE::service_LIO_update()
 
                         auto vec = state_propagate - g_lio_state;
                         solution = K * ( meas_vec - Hsub * vec.block< 6, 1 >( 0, 0 ) );
+
                         // double speed_delta = solution.block( 0, 6, 3, 1 ).norm();
                         // if(solution.block( 0, 6, 3, 1 ).norm() > 0.05 )
                         // {
@@ -847,6 +893,10 @@ int R3LIVE::service_LIO_update()
                         // }
 
                         g_lio_state = state_propagate + solution;
+                        g_lio_state=g_lio_state.normalize_if_large(1);
+                        static std::ofstream myfile = std::ofstream("/catkin_ws/src/r3live/data/L515/new_state.txt", ios::app);
+                        myfile << g_lio_state.to_string(g_lio_state, "STATE_LIO") << "\n";
+
                         print_dash_board();
                         // cout << ANSI_COLOR_RED_BOLD << "Run EKF uph, vec = " << vec.head<9>().transpose() << ANSI_COLOR_RESET << endl;
                         rot_add = solution.block< 3, 1 >( 0, 0 );

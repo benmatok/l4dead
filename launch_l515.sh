@@ -1,0 +1,1 @@
+roslaunch realsense2_camera rs_camera.launch enable_accel:=true enable_gyro:=true unite_imu_method:=linear_interpolation filters:=pointcloud enable_infra:=true pointcloud_texture_stream:=RS2_STREAM_INFRARED enable_color:=false gyro_fps:=400 accel_fps:=400

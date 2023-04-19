@@ -53,3 +53,4 @@ RUN apt -y install code
 
 RUN echo "source /catkin_ws/devel/setup.bash" >> /root/bashrc
 WORKDIR /
+ENV PYTHONPATH "${PYTHONPATH}:/opt/ros/noetic/lib/python3/dist-packages/"

@@ -51,6 +51,7 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
 #include <math.h>
 #include <thread>
 #include <fstream>
+#include <iostream>
 #include <csignal>
 #include <unistd.h>
 #include <so3_math.h>
@@ -196,6 +197,16 @@ public:
     pcl::PointCloud<pcl::PointXYZI>::Ptr laserCloudFullResColor; //(new pcl::PointCloud<pcl::PointXYZI>());
 
     KD_TREE ikdtree;
+
+    enum LID_TYPE
+    {
+        MID,
+        HORIZON,
+        VELO16,
+        OUST64,
+        L515
+    };
+    int m_lidar_type = 0;
 
     ros::Publisher pubLaserCloudFullRes;
     ros::Publisher pubLaserCloudEffect;
@@ -391,11 +402,22 @@ public:
             get_ros_parameter( m_ros_node_handle, "r3live_lio/long_rang_pt_dis", m_long_rang_pt_dis, 500.0 );
             get_ros_parameter( m_ros_node_handle, "r3live_lio/publish_feature_map", m_if_publish_feature_map, false );
             get_ros_parameter( m_ros_node_handle, "r3live_lio/lio_update_point_step", m_lio_update_point_step, 1 );
+            std::vector< double > lidar_ext_t_data;
+            m_ros_node_handle.getParam( "r3live_lio/lidar_ext_t", lidar_ext_t_data );
+            g_lio_state.pos_ext_i2l = Eigen::Map< Eigen::Matrix< double, 3, 1 > >( lidar_ext_t_data.data() );
+            int lidar_undistort;
+            m_ros_node_handle.getParam( "r3live_lio/lidar_undistort", lidar_undistort );
+            g_lio_state.lidar_undistort = lidar_undistort;
         }
         if ( 1 )
         {
             scope_color( ANSI_COLOR_BLUE );
             load_vio_parameters();
+        }
+        if ( 1 )
+        {
+            scope_color( ANSI_COLOR_YELLOW );
+            get_ros_parameter(m_ros_node_handle, "Lidar_front_end/lidar_type", m_lidar_type, 0 );
         }
         if(!Common_tools::if_file_exist(m_map_output_dir))
         {
@@ -431,7 +453,7 @@ public:
     void pointBodyToWorld(const Eigen::Matrix<T, 3, 1> &pi, Eigen::Matrix<T, 3, 1> &po)
     {
         Eigen::Vector3d p_body(pi[0], pi[1], pi[2]);
-        Eigen::Vector3d p_global(g_lio_state.rot_end * (p_body + Lidar_offset_to_IMU) + g_lio_state.pos_end);
+        Eigen::Vector3d p_global(g_lio_state.rot_end * (p_body + g_lio_state.pos_ext_i2l) + g_lio_state.pos_end);
         po[0] = p_global(0);
         po[1] = p_global(1);
         po[2] = p_global(2);
