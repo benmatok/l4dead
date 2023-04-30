@@ -89,9 +89,13 @@ void R3LIVE::imu_cbk( const sensor_msgs::Imu::ConstPtr &msg_in )
 
     imu_buffer_lio.push_back( msg );
     imu_buffer_vio.push_back( msg );
-    // std::cout<<"got imu: "<<timestamp<<" imu size "<<imu_buffer_lio.size()<<std::endl;
+
+
+   //std::cout<<"got imu: "<<timestamp<<" imu size "<<imu_buffer_lio.size()<<std::endl;
+
     mtx_buffer.unlock();
     sig_buffer.notify_all();
+    
 }
 
 void printf_field_name( sensor_msgs::PointCloud2::ConstPtr &msg )
@@ -506,6 +510,7 @@ void R3LIVE::lasermap_fov_segment()
 
 void R3LIVE::feat_points_cbk( const sensor_msgs::PointCloud2::ConstPtr &msg_in )
 {
+
     sensor_msgs::PointCloud2::Ptr msg( new sensor_msgs::PointCloud2( *msg_in ) );
     msg->header.stamp = ros::Time( msg_in->header.stamp.toSec() - m_lidar_imu_time_delay );
     if ( g_camera_lidar_queue.lidar_in( msg_in->header.stamp.toSec() + 0.1 ) == 0 )
@@ -524,6 +529,7 @@ void R3LIVE::feat_points_cbk( const sensor_msgs::PointCloud2::ConstPtr &msg_in )
     last_timestamp_lidar = msg->header.stamp.toSec();
     mtx_buffer.unlock();
     sig_buffer.notify_all();
+
 }
 
 void R3LIVE::wait_render_thread_finish()
@@ -537,6 +543,7 @@ void R3LIVE::wait_render_thread_finish()
 
 int R3LIVE::service_LIO_update()
 {
+    
     nav_msgs::Path path;
     path.header.stamp = ros::Time::now();
     path.header.frame_id = "/world";
@@ -545,7 +552,7 @@ int R3LIVE::service_LIO_update()
     G.setZero();
     H_T_H.setZero();
     I_STATE.setIdentity();
-
+    float moving_avg_lio = 0 ;
     cv::Mat matA1( 3, 3, CV_32F, cv::Scalar::all( 0 ) );
     cv::Mat matD1( 1, 3, CV_32F, cv::Scalar::all( 0 ) );
     cv::Mat matV1( 3, 3, CV_32F, cv::Scalar::all( 0 ) );
@@ -574,6 +581,7 @@ int R3LIVE::service_LIO_update()
     set_initial_state_cov( g_lio_state );
     while ( ros::ok() )
     {
+        std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
         if ( flg_exit )
             break;
         ros::spinOnce();
@@ -605,7 +613,8 @@ int R3LIVE::service_LIO_update()
             g_LiDAR_frame_index++;
             tim.tic( "Preprocess" );
             double t0, t1, t2, t3, t4, t5, match_start, match_time, solve_start, solve_time, pca_time, svd_time;
-            match_time = 0;
+            match_time = 0 ; 
+
             kdtree_search_time = 0;
             solve_time = 0;
             pca_time = 0;
@@ -749,7 +758,8 @@ int R3LIVE::service_LIO_update()
                         /// PCA (using minimum square method)
                         cv::Mat matA0( NUM_MATCH_POINTS, 3, CV_32F, cv::Scalar::all( 0 ) );
                         cv::Mat matB0( NUM_MATCH_POINTS, 1, CV_32F, cv::Scalar::all( -1 ) );
-                        cv::Mat matX0( NUM_MATCH_POINTS, 1, CV_32F, cv::Scalar::all( 0 ) );
+                        //cv::Mat matX0( NUM_MATCH_POINTS, 1, CV_32F, cv::Scalar::all( 0 ) );
+                        cv::Mat matX0( 3, 1, CV_32F, cv::Scalar::all( 0 ) );
 
                         for ( int j = 0; j < NUM_MATCH_POINTS; j++ )
                         {
@@ -909,6 +919,7 @@ int R3LIVE::service_LIO_update()
 
                         deltaR = rot_add.norm() * 57.3;
                         deltaT = t_add.norm() * 100;
+        
                     }
 
                     // printf_line;
@@ -978,14 +989,22 @@ int R3LIVE::service_LIO_update()
                         featsArray[ cubeInd ]->push_back( pointSel );
                     }
                 }
-
+                //PointCloudXYZINormal::Ptr points_to_add(new PointCloudXYZINormal::Ptr () ) ; 
                 for ( int i = 0; i < feats_down_size; i++ )
                 {
                     /* transform to world frame */
-                    pointBodyToWorld( &( feats_down->points[ i ] ), &( feats_down_updated->points[ i ] ) );
+                    pointBodyToWorld( &( feats_down->points[ i ] ), &( feats_down_updated->points[ i ] ) ) ; 
+
+                    //if(res_last[i < 0.02 ])
+                    //{
+                   //     points_to_add->push_back(feats_down->points[ i ]) ; 
+                    //}
+
                 }
                 t4 = omp_get_wtime();
-               
+                
+                //PointCloudXYZINormal::Ptr points_to_add(new PointCloudXYZINormal::Ptr () ) ; 
+
                 ikdtree.Add_Points( feats_down_updated->points, true );
                 
                 kdtree_incremental_time = omp_get_wtime() - t4 + readd_time + readd_box_time + delete_box_time;
@@ -1127,6 +1146,11 @@ int R3LIVE::service_LIO_update()
         }
         status = ros::ok();
         rate.sleep();
+        std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+        moving_avg_lio = 0.8*moving_avg_lio + 0.2*(float)std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()/1000.0  ; 
+        std::cout << "Time difference_lio = " << moving_avg_lio  << "[ms]" << std::endl ; 
+        std::cout << "points_size " << Measures.lidar->size() << std::endl;
+
     }
     return 0;
 }
