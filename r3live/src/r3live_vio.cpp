@@ -1213,7 +1213,7 @@ void R3LIVE::service_VIO_update()
         tim.tic( "Vio_f2m" );
         res_photometric = vio_photometric( state_out, op_track, img_pose );
         g_cost_time_logger.record( tim, "Vio_f2m" );
-        g_lio_state = state_out;
+        //g_lio_state = state_out;
         print_dash_board();
         set_image_pose( img_pose, state_out );
 

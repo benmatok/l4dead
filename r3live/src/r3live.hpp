@@ -168,6 +168,8 @@ public:
     double HALF_FOV_COS = 0.0;
     double FOV_DEG = 0.0;
     double res_mean_last = 0.05;
+    double res_max = -1;
+
     double total_distance = 0.0;
     Eigen::Vector3d position_last = Zero3d;
     double copy_time, readd_time, fov_check_time, readd_box_time, delete_box_time;
@@ -436,7 +438,7 @@ public:
         XAxisPoint_body = Eigen::Vector3f(LIDAR_SP_LEN, 0.0, 0.0);
         XAxisPoint_world = Eigen::Vector3f(LIDAR_SP_LEN, 0.0, 0.0);
 
-        downSizeFilterSurf.setLeafSize(m_voxel_downsample_size_surf, m_voxel_downsample_size_surf, m_voxel_downsample_size_axis_z);
+        downSizeFilterSurf.setLeafSize(0.1, 0.1, 0.1);
         downSizeFilterMap.setLeafSize(filter_size_map_min, filter_size_map_min, filter_size_map_min);
 
         m_lio_state_fp = fopen( std::string(m_map_output_dir).append("/lic_lio.log").c_str(), "w+");
