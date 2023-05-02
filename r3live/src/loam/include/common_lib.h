@@ -260,26 +260,34 @@ struct Camera_Lidar_queue
         cout<< std::setprecision(15) <<  "Camera time = " << cam_last_time << ", LiDAR last time =  "<< lidar_last_time << endl;        
     }
 
-    bool if_lidar_can_process()
+    bool if_lidar_can_process(int frame_number)
     {
         // m_if_have_lidar_data = 1;
         double cam_last_time = get_camera_front_time();
         double lidar_last_time = get_lidar_front_time();
+        
         if (m_if_have_camera_data == 0)
         {
+
             return true;
         }
 
         if (cam_last_time < 0 || lidar_last_time < 0)
         {
             // cout << "Cam_tim = " << cam_last_time << ", lidar_last_time = " << lidar_last_time << endl; 
+
             return false;
         }
 
 
-        if (lidar_last_time > cam_last_time)
+        if (lidar_last_time - cam_last_time >= 0.1)
         {
             // Camera data need process first.
+            if(frame_number == 433 )
+            {
+                double x = 5 ;
+                //std::cout << lidar_last_time << " " << cam_last_time << std::endl;
+            }
             return false;
         }
         else
@@ -287,8 +295,11 @@ struct Camera_Lidar_queue
             // scope_color(ANSI_COLOR_BLUE_BOLD);
             // cout << "LiDAR can update, " << get_lidar_front_time() - m_first_imu_time << " | " << get_camera_front_time() - m_first_imu_time << endl;
             // printf_line;
+
             return true;
         }
+
+
         return false;
     }
 };

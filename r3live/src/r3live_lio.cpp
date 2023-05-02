@@ -1,9 +1,7 @@
 /*
 This code is the implementation of our paper "R3LIVE: A Robust, Real-time, RGB-colored,
 LiDAR-Inertial-Visual tightly-coupled state Estimation and mapping package".
-
 Author: Jiarong Lin   < ziv.lin.ljr@gmail.com >
-
 If you use any code of this repo in your academic research, please cite at least
 one of our papers:
 [1] Lin, Jiarong, and Fu Zhang. "R3LIVE: A Robust, Real-time, RGB-colored,
@@ -17,13 +15,10 @@ one of our papers:
     Robotic Applications."
 [6] Lin, Jiarong, and Fu Zhang. "Loam-livox: A fast, robust, high-precision
     LiDAR odometry and mapping package for LiDARs of small FoV."
-
 For commercial use, please contact me < ziv.lin.ljr@gmail.com > and
 Dr. Fu Zhang < fuzhang@hku.hk >.
-
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
-
  1. Redistributions of source code must retain the above copyright notice,
     this list of conditions and the following disclaimer.
  2. Redistributions in binary form must reproduce the above copyright notice,
@@ -32,7 +27,6 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
  3. Neither the name of the copyright holder nor the names of its
     contributors may be used to endorse or promote products derived from this
     software without specific prior written permission.
-
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -585,17 +579,27 @@ int R3LIVE::service_LIO_update()
     int iter_counter = 0;
     while (ros::ok())
     {
-
+        if(g_LiDAR_frame_index == 433 )
+            {
+                std::cout << "hiiiii" << std::endl;
+            }
+        
         std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
         if (flg_exit)
             break;
         ros::spinOnce();
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        while (g_camera_lidar_queue.if_lidar_can_process() == false)
+        if(g_LiDAR_frame_index == 433 )
+            {
+                std::cout << "biiiii" << std::endl;
+            }
+        while (  g_camera_lidar_queue.if_lidar_can_process(g_LiDAR_frame_index) == false)
         {
             ros::spinOnce();
             std::this_thread::yield();
             std::this_thread::sleep_for(std::chrono::milliseconds(THREAD_SLEEP_TIM));
+
+
         }
         std::unique_lock<std::mutex> lock(m_mutex_lio_process);
         if (1)
@@ -608,6 +612,7 @@ int R3LIVE::service_LIO_update()
             }
             int lidar_can_update = 1;
             g_lidar_star_tim = frame_first_pt_time;
+
             if (flg_reset)
             {
                 ROS_WARN("reset when rosbag play back");
@@ -616,6 +621,8 @@ int R3LIVE::service_LIO_update()
                 continue;
             }
             g_LiDAR_frame_index++;
+
+
             tim.tic("Preprocess");
             double t0, t1, t2, t3, t4, t5, match_start, match_time, solve_start, solve_time, pca_time, svd_time;
             match_time = 0;

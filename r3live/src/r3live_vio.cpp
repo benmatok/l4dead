@@ -1123,7 +1123,6 @@ void R3LIVE::service_VIO_update()
             ros::spinOnce();
             std::this_thread::sleep_for( std::chrono::milliseconds( THREAD_SLEEP_TIM ) );
             std::this_thread::yield();
-            //std::cout << "111111111111111111111111" << std::endl ; 
             continue;
         }
 
@@ -1188,7 +1187,6 @@ void R3LIVE::service_VIO_update()
         if ( vio_preintegration( g_lio_state, state_out, img_pose->m_timestamp + g_lio_state.td_ext_i2c ) == false )
         {
             m_mutex_lio_process.unlock();
-            std::cout << "4444444444444444444" << std::endl ; 
             continue;
         }
         set_image_pose( img_pose, state_out );
