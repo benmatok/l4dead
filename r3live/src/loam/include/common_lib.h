@@ -279,16 +279,11 @@ struct Camera_Lidar_queue
             return false;
         }
 
-
+ 
         if (lidar_last_time - cam_last_time >= 0.1)
         {
-            // Camera data need process first.
-            if(frame_number == 433 )
-            {
-                double x = 5 ;
-                //std::cout << lidar_last_time << " " << cam_last_time << std::endl;
-            }
-            return false;
+            //Camera data need process first.
+            return true;
         }
         else
         {
@@ -300,7 +295,7 @@ struct Camera_Lidar_queue
         }
 
 
-        return false;
+        return true;
     }
 };
 

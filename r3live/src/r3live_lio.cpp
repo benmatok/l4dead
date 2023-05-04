@@ -253,6 +253,25 @@ void R3LIVE::pointBodyToWorld(PointType const *const pi, PointType *const po)
     po->intensity = pi->intensity;
 }
 
+
+
+void R3LIVE::pointBodyToWorldState(PointType const *const pi, PointType *const po ,StatesGroup  curr_state )
+{
+    Eigen::Vector3d p_body(pi->x, pi->y, pi->z);
+    Eigen::Vector3d p_global(curr_state.rot_end * (p_body + curr_state.pos_ext_i2l) + curr_state.pos_end);
+
+    po->x = p_global(0);
+    po->y = p_global(1);
+    po->z = p_global(2);
+    po->intensity = pi->intensity;
+}
+
+
+
+
+
+
+
 void R3LIVE::RGBpointBodyToWorld(PointType const *const pi, pcl::PointXYZI *const po)
 {
     Eigen::Vector3d p_body(pi->x, pi->y, pi->z);
@@ -557,8 +576,6 @@ int R3LIVE::service_LIO_update()
     PointCloudXYZINormal::Ptr feats_down(new PointCloudXYZINormal());
     PointCloudXYZINormal::Ptr laserCloudOri(new PointCloudXYZINormal());
     PointCloudXYZINormal::Ptr coeffSel(new PointCloudXYZINormal());
-    std::ofstream outfile;
-    outfile.open("/residual_mean.txt");
     /*** variables initialize ***/
     FOV_DEG = fov_deg + 10;
     HALF_FOV_COS = std::cos((fov_deg + 10.0) * 0.5 * PI_M / 180.0);
@@ -579,20 +596,21 @@ int R3LIVE::service_LIO_update()
     int iter_counter = 0;
     while (ros::ok())
     {
-        if(g_LiDAR_frame_index == 433 )
-            {
-                std::cout << "hiiiii" << std::endl;
-            }
-        
+        std::ofstream outfile;
+        outfile.open("/residuals/residual" + std::to_string(g_LiDAR_frame_index) + ".txt");
+
         std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-        if (flg_exit)
+        
+        if(flg_exit)
+        {
             break;
+        }
+
+
+
+
         ros::spinOnce();
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        if(g_LiDAR_frame_index == 433 )
-            {
-                std::cout << "biiiii" << std::endl;
-            }
         while (  g_camera_lidar_queue.if_lidar_can_process(g_LiDAR_frame_index) == false)
         {
             ros::spinOnce();
@@ -601,9 +619,7 @@ int R3LIVE::service_LIO_update()
 
 
         }
-        std::unique_lock<std::mutex> lock(m_mutex_lio_process);
-        if (1)
-        {
+            std::unique_lock<std::mutex> lock(m_mutex_lio_process);
             // printf_line;
             Common_tools::Timer tim;
             if (sync_packages(Measures) == 0)
@@ -692,7 +708,8 @@ int R3LIVE::service_LIO_update()
             /*** ICP and iterated Kalman filter update ***/
             PointCloudXYZINormal::Ptr coeffSel_tmpt(new PointCloudXYZINormal(*feats_down));
             PointCloudXYZINormal::Ptr feats_down_updated(new PointCloudXYZINormal(*feats_down));
-            std::vector<double> res_last(feats_down_size, 1000.0); // initial
+            std::vector<double> res_last(feats_down_size, 1000.0);
+            std::vector<double> res_not_abs(feats_down_size, 1000.0); // initial
 
             if (featsFromMapNum >= 5)
             {
@@ -726,22 +743,23 @@ int R3LIVE::service_LIO_update()
                 double maximum_pt_range = 0.0;
                 // cout <<"Preprocess 2 cost time: " << tim.toc("Preprocess") << endl;
                  PointCloudXYZINormal::Ptr first_scan(new PointCloudXYZINormal(*feats_down));
+
+
                 for (iterCount = 0; iterCount < NUM_MAX_ITERATIONS; iterCount++)
                 {
-        
-                    tim.tic("Iter");
+
+
+           
+                                        tim.tic("Iter");
                     match_start = omp_get_wtime();
                     laserCloudOri->clear();
                     coeffSel->clear();
-
+                    std::vector<PointType> surface_points ;
+                    std::vector<PointType> surface_points_normals ;
                     /** closest surface search and residual computation **/
                     for (int i = 0; i < feats_down_size; i += m_lio_update_point_step)
                     {
-                        if(iterCount == 0 && iter_counter == 1 )
-                    {
-                         pointBodyToWorld(&(feats_down->points[i]), &(first_scan->points[i]));
-                    }
-                
+                    
                         double search_start = omp_get_wtime();
                         PointType &pointOri_tmpt = feats_down->points[i];
                         double ori_pt_dis =
@@ -755,8 +773,6 @@ int R3LIVE::service_LIO_update()
 
                         auto &points_near = Nearest_Points[i];
 
-                        if (iterCount == 0 || rematch_en)
-                        {
                             point_selected_surf[i] = true;
                             /** Find the closest surfaces in the map **/
                             ikdtree.Nearest_Search(pointSel_tmpt, NUM_MATCH_POINTS, points_near, pointSearchSqDis_surf);
@@ -767,11 +783,15 @@ int R3LIVE::service_LIO_update()
                             {
                                 point_selected_surf[i] = false;
                             }
-                        }
 
                         kdtree_search_time += omp_get_wtime() - search_start;
                         if (point_selected_surf[i] == false)
                             continue;
+                        
+
+
+                        
+
 
                         // match_time += omp_get_wtime() - match_start;
                         double pca_start = omp_get_wtime();
@@ -835,12 +855,19 @@ int R3LIVE::service_LIO_update()
                                 //     res_last[i] = 0.0;
                                 //     continue;
                                 // }
+                                
+
+
+                                surface_points.push_back(pointSel_tmpt) ;
+                                
                                 point_selected_surf[i] = true;
                                 coeffSel_tmpt->points[i].x = pa;
                                 coeffSel_tmpt->points[i].y = pb;
                                 coeffSel_tmpt->points[i].z = pc;
                                 coeffSel_tmpt->points[i].intensity = pd2;
                                 res_last[i] = std::abs(pd2);
+                                res_not_abs[i] = pd2;
+                                surfce_points_normals.push_back(coeffSel_tmpt->points[i]) ; 
                             }
                             else
                             {
@@ -848,48 +875,54 @@ int R3LIVE::service_LIO_update()
                             }
                         }
                         pca_time += omp_get_wtime() - pca_start;
+
                     }
+
+
+
+
+
+
+
+                 StatesGroup best_state = g_lio_state  ;
+                 std::vector<int> best_agree_points ;  
+                 double best_num_agree = 0 ;
+                for(int ransac_iter = 0 ; ransac_iter <100 ; ransac_iter++)
+                 {
+                    StatesGroup ransac_state = g_lio_state  ;
+
+
+
+
+
+
                     tim.tic("Stack");
+                    std::set<int> selected_ind;
+                     while(selected_ind<3)
+                     {
+                     int ind  = 1 + std::rand()/((RAND_MAX + 1u)/surface_points.size() );
+                     selected_ind.insert(ind) ; 
+                     }
 
-                    double total_residual = 0.0;
-                    laserCloudSelNum = 0;
 
-                    for (int i = 0; i < coeffSel_tmpt->points.size(); i++)
-                    {
-                        if (point_selected_surf[i] && (res_last[i] <= 2.0))
-                        {
-                            laserCloudOri->push_back(feats_down->points[i]);
-                            coeffSel->push_back(coeffSel_tmpt->points[i]);
-                            total_residual += res_last[i];
-                            if (res_max < res_last[i])
-                            {
-                                res_max = res_last[i];
-                            }
-                            laserCloudSelNum++;
-                        }
-                    }
-                    res_mean_last = total_residual / laserCloudSelNum;
-                    outfile << res_max << std::endl;
-                    res_max = -1;
 
-                    match_time += omp_get_wtime() - match_start;
-                    solve_start = omp_get_wtime();
 
                     /*** Computation of Measuremnt Jacobian matrix H and measurents vector ***/
-                    Eigen::MatrixXd Hsub(laserCloudSelNum, 6);
-                    Eigen::VectorXd meas_vec(laserCloudSelNum);
+                    Eigen::MatrixXd Hsub(3, 6);
+                    Eigen::VectorXd meas_vec(3);
                     Hsub.setZero();
 
-                    for (int i = 0; i < laserCloudSelNum; i++)
+
+                    for (int i : selected_ind)
                     {
-                        const PointType &laser_p = laserCloudOri->points[i];
+                        const PointType &laser_p = surface_points->points[i];
                         Eigen::Vector3d point_this(laser_p.x, laser_p.y, laser_p.z);
                         point_this += g_lio_state.pos_ext_i2l;
                         Eigen::Matrix3d point_crossmat;
                         point_crossmat << SKEW_SYM_MATRIX(point_this);
 
                         /*** get the normal vector of closest surface/corner ***/
-                        const PointType &norm_p = coeffSel->points[i];
+                        const PointType &norm_p = surface_points_normals->points[i];
                         Eigen::Vector3d norm_vec(norm_p.x, norm_p.y, norm_p.z);
 
                         /*** calculate the Measuremnt Jacobian matrix H ***/
@@ -910,10 +943,10 @@ int R3LIVE::service_LIO_update()
                         cout << ANSI_COLOR_RED_BOLD << "Run EKF init" << ANSI_COLOR_RESET << endl;
                         /*** only run in initialization period ***/
                         set_initial_state_cov(g_lio_state);
+                        break ;
                     }
                     else
                     {
-                        // cout << ANSI_COLOR_RED_BOLD << "Run EKF uph" << ANSI_COLOR_RESET << endl;
                         auto &&Hsub_T = Hsub.transpose();
                         H_T_H.block<6, 6>(0, 0) = Hsub_T * Hsub;
                         Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> &&K_1 =
@@ -923,135 +956,127 @@ int R3LIVE::service_LIO_update()
                         auto vec = state_propagate - g_lio_state;
                         solution = K * (meas_vec - Hsub * vec.block<6, 1>(0, 0));
 
-                        // double speed_delta = solution.block( 0, 6, 3, 1 ).norm();
-                        // if(solution.block( 0, 6, 3, 1 ).norm() > 0.05 )
-                        // {
-                        //     solution.block( 0, 6, 3, 1 ) = solution.block( 0, 6, 3, 1 ) / speed_delta * 0.05;
-                        // }
 
-                        g_lio_state = state_propagate + solution;
-                        g_lio_state = g_lio_state.normalize_if_large(1);
-                        static std::ofstream myfile = std::ofstream("/catkin_ws/src/r3live/data/L515/new_state.txt", ios::app);
-                        myfile << g_lio_state.to_string(g_lio_state, "STATE_LIO") << "\n";
-
+                        ransac_state = state_propagate + solution;
+                        ransac_state = ransac_state.normalize_if_large(1);
                         print_dash_board();
-                        // cout << ANSI_COLOR_RED_BOLD << "Run EKF uph, vec = " << vec.head<9>().transpose() << ANSI_COLOR_RESET << endl;
                         rot_add = solution.block<3, 1>(0, 0);
                         t_add = solution.block<3, 1>(3, 0);
-                        flg_EKF_converged = false;
-                        if (((rot_add.norm() * 57.3 - deltaR) < 0.01) && ((t_add.norm() * 100 - deltaT) < 0.015))
-                        {
-                            flg_EKF_converged = true;
-                        }
+                        //flg_EKF_converged = false;
 
                         deltaR = rot_add.norm() * 57.3;
                         deltaT = t_add.norm() * 100;
                     }
 
-                    // printf_line;
-                    g_lio_state.last_update_time = Measures.lidar_end_time;
-                    euler_cur = RotMtoEuler(g_lio_state.rot_end);
-                    dump_lio_state_to_log(m_lio_state_fp);
 
-                    /*** Rematch Judgement ***/
-                    rematch_en = false;
-                    if (flg_EKF_converged || ((rematch_num == 0) && (iterCount == (NUM_MAX_ITERATIONS - 2))))
+                    std::vector<int> agree_points ;  
+                    double num_agree = 0 ;
+
+                    //check how many points agree 
+                    for(int i  = 0 ; i<surface_points.size()  ; i++)
                     {
-                        rematch_en = true;
-                        rematch_num++;
-                    }
+                        double res = surface_points[i].x*surface_points_normals[i].x  +  surface_points[i].y * surface_points_normals[i].y +   surface_points_normals[i].z*surface_points[i].z ;
+                        if(std::abs(res) < 0.1 ) {
+                            num_agree++;
+                            agree_points.push_back(i) ; 
 
-                    /*** Convergence Judgements and Covariance Update ***/
-                    // if (rematch_num >= 10 || (iterCount == NUM_MAX_ITERATIONS - 1))
-                    if (rematch_num >= 2 || (iterCount == NUM_MAX_ITERATIONS - 1)) // Fast lio ori version.
-                    {
-                        if (flg_EKF_inited)
-                        {
-                            /*** Covariance Update ***/
-                            G.block<DIM_OF_STATES, 6>(0, 0) = K * Hsub;
-                            g_lio_state.cov = (I_STATE - G) * g_lio_state.cov;
-                            total_distance += (g_lio_state.pos_end - position_last).norm();
-                            position_last = g_lio_state.pos_end;
-
-                            // std::cout << "position: " << g_lio_state.pos_end.transpose() << " total distance: " << total_distance << std::endl;
                         }
-                        solve_time += omp_get_wtime() - solve_start;
-                        break;
+
                     }
-                    solve_time += omp_get_wtime() - solve_start;
-                    // cout << "Match cost time: " << match_time * 1000.0
-                    //      << ", search cost time: " << kdtree_search_time*1000.0
-                    //      << ", PCA cost time: " << pca_time*1000.0
-                    //      << ", solver_cost: " << solve_time * 1000.0 << endl;
-                    // cout <<"Iter cost time: " << tim.toc("Iter") << endl;
-                
 
 
-
-
-
-                }
-
-                t3 = omp_get_wtime();
-
-                /*** add new frame points to map ikdtree ***/
-                PointVector points_history;
-                ikdtree.acquire_removed_points(points_history);
-
-                memset(cube_updated, 0, sizeof(cube_updated));
-
-                for (int i = 0; i < points_history.size(); i++)
-                {
-                    PointType &pointSel = points_history[i];
-
-                    int cubeI = int((pointSel.x + 0.5 * cube_len) / cube_len) + laserCloudCenWidth;
-                    int cubeJ = int((pointSel.y + 0.5 * cube_len) / cube_len) + laserCloudCenHeight;
-                    int cubeK = int((pointSel.z + 0.5 * cube_len) / cube_len) + laserCloudCenDepth;
-
-                    if (pointSel.x + 0.5 * cube_len < 0)
-                        cubeI--;
-                    if (pointSel.y + 0.5 * cube_len < 0)
-                        cubeJ--;
-                    if (pointSel.z + 0.5 * cube_len < 0)
-                        cubeK--;
-
-                    if (cubeI >= 0 && cubeI < laserCloudWidth && cubeJ >= 0 && cubeJ < laserCloudHeight && cubeK >= 0 && cubeK < laserCloudDepth)
+                    if(best_num_agree <num_agree  )
                     {
-                        int cubeInd = cubeI + laserCloudWidth * cubeJ + laserCloudWidth * laserCloudHeight * cubeK;
-                        featsArray[cubeInd]->push_back(pointSel);
+                        best_agree_points = agree_points ; 
+                        best_num_agree = num_agree ; 
                     }
-                }
-                PointCloudXYZINormal::Ptr points_to_add(new PointCloudXYZINormal());
-                double counter_new = 0;
-                // std::ofstream outfile;
-                //  outfile.open("/residual.txt");
 
-                for (int i = 0; i < feats_down_size; i++)
-                {
-                    /* transform to world frame */
 
-                    pointBodyToWorld(&(feats_down->points[i]), &(feats_down_updated->points[i]));
-                    if (res_last[i] <= 0.02 || !point_selected_surf[i] || res_last[i]> 2 )
-                    {
-                        points_to_add->push_back(feats_down_updated->points[i]);
-                        // outfile << std::setprecision(9) << res_last[i] << std::endl;
-                        counter_new++;
-                    }
+
+
+
+
+
                 }
 
-                t4 = omp_get_wtime();
-                if (iter_counter == 1)
-                {
-                    pcl::io::savePCDFileBinary("/last.pcd", *feats_down_updated);
-                    m_map_rgb_pts.save_to_pcd("/", "map.pcd");
-                    pcl::io::savePCDFileBinary("/start.pcd", *first_scan);
-                }
-                ikdtree.Add_Points(points_to_add->points, true);
-                kdtree_incremental_time = omp_get_wtime() - t4 + readd_time + readd_box_time + delete_box_time;
-                t5 = omp_get_wtime();
+
             }
 
-            /******* Publish current frame points in world coordinates:  *******/
+
+
+                Eigen::MatrixXd Hsub(best_agree_points.size(), 6);
+                Eigen::VectorXd meas_vec(best_agree_points.size());
+                Hsub.setZero();
+
+                for (int i =0 ; i<best_agree_points.size() ;i++ )
+                    {
+                        const PointType &laser_p = surface_points[i];
+                        Eigen::Vector3d point_this(laser_p.x, laser_p.y, laser_p.z);
+                        point_this += g_lio_state.pos_ext_i2l;
+                        Eigen::Matrix3d point_crossmat;
+                        point_crossmat << SKEW_SYM_MATRIX(point_this);
+
+                        /*** get the normal vector of closest surface/corner ***/
+                        const PointType &norm_p = surface_points_normals[i];
+                        Eigen::Vector3d norm_vec(norm_p.x, norm_p.y, norm_p.z);
+
+                        /*** calculate the Measuremnt Jacobian matrix H ***/
+                        Eigen::Vector3d A(point_crossmat * g_lio_state.rot_end.transpose() * norm_vec);
+                        Hsub.row(i) << VEC_FROM_ARRAY(A), norm_p.x, norm_p.y, norm_p.z;
+
+                        /*** Measuremnt: distance to the closest surface/corner ***/
+                        meas_vec(i) = -norm_p.intensity;
+                    }
+
+
+
+                if (!flg_EKF_inited)
+                    {
+                        cout << ANSI_COLOR_RED_BOLD << "Run EKF init" << ANSI_COLOR_RESET << endl;
+                        /*** only run in initialization period ***/
+                        set_initial_state_cov(g_lio_state);
+                    }
+                    else
+                    {
+                        auto &&Hsub_T = Hsub.transpose();
+                        H_T_H.block<6, 6>(0, 0) = Hsub_T * Hsub;
+                        Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> &&K_1 =
+                            (H_T_H + (g_lio_state.cov / LASER_POINT_COV).inverse()).inverse();
+                        K = K_1.block<DIM_OF_STATES, 6>(0, 0) * Hsub_T;
+
+                        auto vec = state_propagate - g_lio_state;
+                        solution = K * (meas_vec - Hsub * vec.block<6, 1>(0, 0));
+
+
+                        g_lio_state = state_propagate + solution;
+                        g_lio_state = g_lio_state.normalize_if_large(1);
+                        print_dash_board();
+                        rot_add = solution.block<3, 1>(0, 0);
+                        t_add = solution.block<3, 1>(3, 0);
+                        flg_EKF_converged = false;
+
+                        deltaR = rot_add.norm() * 57.3;
+                        deltaT = t_add.norm() * 100;
+                    }
+
+
+            
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+             /******* Publish current frame points in world coordinates:  *******/
             laserCloudFullRes2->clear();
             *laserCloudFullRes2 = dense_map_en ? (*feats_undistort) : (*feats_down);
 
@@ -1193,7 +1218,12 @@ int R3LIVE::service_LIO_update()
         std::cout << "Time difference_lio = " << moving_avg_lio << "[ms]" << std::endl;
         std::cout << "points_size " << Measures.lidar->size() << std::endl;
         iter_counter++;
+        outfile.close();
     }
-    outfile.close();
-    return 0;
+
+   return 0;
+
 }
+    
+
+

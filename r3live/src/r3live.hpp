@@ -450,7 +450,7 @@ public:
 
     //project lidar frame to world
     void pointBodyToWorld(PointType const *const pi, PointType *const po);
-
+    void pointBodyToWorldState(PointType const *const pi, PointType *const po ,StatesGroup  curr_state ) ; 
     template <typename T>
     void pointBodyToWorld(const Eigen::Matrix<T, 3, 1> &pi, Eigen::Matrix<T, 3, 1> &po)
     {
@@ -460,6 +460,7 @@ public:
         po[1] = p_global(1);
         po[2] = p_global(2);
     }
+    
     void RGBpointBodyToWorld(PointType const *const pi, pcl::PointXYZI *const po);
     int get_cube_index(const int &i, const int &j, const int &k);
     bool center_in_FOV(Eigen::Vector3f cube_p);
