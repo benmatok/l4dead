@@ -1009,13 +1009,6 @@ int R3LIVE::service_LIO_update()
 
                     /*** Measuremnt: distance to the closest surface/corner ***/
                     double res  = norm_p.x * laser_p.x + norm_p.y * laser_p.y + norm_p.z * laser_p.z + norm_p.intensity  ;  
-                if(j==0)    
-                {
-                    for(int iter = 0 ; iter < meas_vec.size() ; iter++)
-                    {
-                    outfile<< std::setprecision(9) << res << std::endl ; 
-                    }
-                }
                     //res = std::abs(res) ; 
                     meas_vec(index)  = -1*res;
 
@@ -1048,8 +1041,8 @@ int R3LIVE::service_LIO_update()
                     g_lio_state = g_lio_state.normalize_if_large(1);
 
 
-                    //if(j==19)
-                    //{
+                    if(j==19)
+                    {
 
                     //for(int iter = 0 ; iter < meas_vec.size() ; iter++)
                     //{
@@ -1062,6 +1055,7 @@ int R3LIVE::service_LIO_update()
                     g_lio_state.cov = (I_STATE - G) * g_lio_state.cov;
                     position_last = g_lio_state.pos_end;
                     solve_time += omp_get_wtime() - solve_start;
+                    }
                 }
 
 
