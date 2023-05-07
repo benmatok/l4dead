@@ -891,6 +891,12 @@ int R3LIVE::service_LIO_update()
                     Hsub.setZero();
                     
                     int count = 0 ;
+                    
+
+
+                    for( int  j = 0 ;j< 20 ; j++)
+                    {
+
                     for (int i : selected_ind)
                     {
 
@@ -915,11 +921,6 @@ int R3LIVE::service_LIO_update()
                         meas_vec(count) = -1*res;
                         count++ ; 
                     }
-                    
-
-
-                    for( int  j = 0 ;j< 20 ; j++)
-                    {
                         
 
 
