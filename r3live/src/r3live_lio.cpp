@@ -1,9 +1,7 @@
 /*
 This code is the implementation of our paper "R3LIVE: A Robust, Real-time, RGB-colored,
 LiDAR-Inertial-Visual tightly-coupled state Estimation and mapping package".
-
 Author: Jiarong Lin   < ziv.lin.ljr@gmail.com >
-
 If you use any code of this repo in your academic research, please cite at least
 one of our papers:
 [1] Lin, Jiarong, and Fu Zhang. "R3LIVE: A Robust, Real-time, RGB-colored,
@@ -17,13 +15,10 @@ one of our papers:
     Robotic Applications."
 [6] Lin, Jiarong, and Fu Zhang. "Loam-livox: A fast, robust, high-precision
     LiDAR odometry and mapping package for LiDARs of small FoV."
-
 For commercial use, please contact me < ziv.lin.ljr@gmail.com > and
 Dr. Fu Zhang < fuzhang@hku.hk >.
-
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
-
  1. Redistributions of source code must retain the above copyright notice,
     this list of conditions and the following disclaimer.
  2. Redistributions in binary form must reproduce the above copyright notice,
@@ -32,7 +27,6 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
  3. Neither the name of the copyright holder nor the names of its
     contributors may be used to endorse or promote products derived from this
     software without specific prior written permission.
-
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -46,7 +40,6 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
  POSSIBILITY OF SUCH DAMAGE.
 */
 #include "r3live.hpp"
-	
 
 #include <iostream>
 #include <pcl/io/pcd_io.h>
@@ -252,6 +245,17 @@ void R3LIVE::pointBodyToWorld(PointType const *const pi, PointType *const po)
 {
     Eigen::Vector3d p_body(pi->x, pi->y, pi->z);
     Eigen::Vector3d p_global(g_lio_state.rot_end * (p_body + g_lio_state.pos_ext_i2l) + g_lio_state.pos_end);
+
+    po->x = p_global(0);
+    po->y = p_global(1);
+    po->z = p_global(2);
+    po->intensity = pi->intensity;
+}
+
+void R3LIVE::pointBodyToWorldState(PointType const *const pi, PointType *const po, StatesGroup curr_state)
+{
+    Eigen::Vector3d p_body(pi->x, pi->y, pi->z);
+    Eigen::Vector3d p_global(curr_state.rot_end * (p_body + curr_state.pos_ext_i2l) + curr_state.pos_end);
 
     po->x = p_global(0);
     po->y = p_global(1);
@@ -563,8 +567,6 @@ int R3LIVE::service_LIO_update()
     PointCloudXYZINormal::Ptr feats_down(new PointCloudXYZINormal());
     PointCloudXYZINormal::Ptr laserCloudOri(new PointCloudXYZINormal());
     PointCloudXYZINormal::Ptr coeffSel(new PointCloudXYZINormal());
-    std::ofstream outfile;
-    outfile.open("/residual_mean.txt");
     /*** variables initialize ***/
     FOV_DEG = fov_deg + 10;
     HALF_FOV_COS = std::cos((fov_deg + 10.0) * 0.5 * PI_M / 180.0);
@@ -585,465 +587,530 @@ int R3LIVE::service_LIO_update()
     int iter_counter = 0;
     while (ros::ok())
     {
+        std::ofstream outfile;
+        outfile.open("/residuals/residual" + std::to_string(g_LiDAR_frame_index) + ".txt");
 
         std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+
         if (flg_exit)
+        {
             break;
+        }
+
         ros::spinOnce();
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        while (g_camera_lidar_queue.if_lidar_can_process() == false)
+        while (g_camera_lidar_queue.if_lidar_can_process(g_LiDAR_frame_index) == false)
         {
             ros::spinOnce();
             std::this_thread::yield();
             std::this_thread::sleep_for(std::chrono::milliseconds(THREAD_SLEEP_TIM));
         }
         std::unique_lock<std::mutex> lock(m_mutex_lio_process);
-        if (1)
+        // printf_line;
+        Common_tools::Timer tim;
+        if (sync_packages(Measures) == 0)
         {
-            // printf_line;
-            Common_tools::Timer tim;
-            if (sync_packages(Measures) == 0)
-            {
-                continue;
-            }
-            int lidar_can_update = 1;
-            g_lidar_star_tim = frame_first_pt_time;
-            if (flg_reset)
-            {
-                ROS_WARN("reset when rosbag play back");
-                p_imu->Reset();
-                flg_reset = false;
-                continue;
-            }
-            g_LiDAR_frame_index++;
-            tim.tic("Preprocess");
-            double t0, t1, t2, t3, t4, t5, match_start, match_time, solve_start, solve_time, pca_time, svd_time;
-            match_time = 0;
+            continue;
+        }
+        int lidar_can_update = 1;
+        g_lidar_star_tim = frame_first_pt_time;
 
-            kdtree_search_time = 0 ; 
-            solve_time = 0;
-            pca_time = 0;
-            svd_time = 0;
-            t0 = omp_get_wtime();
-            p_imu->Process(Measures, g_lio_state, feats_undistort);
+        if (flg_reset)
+        {
+            ROS_WARN("reset when rosbag play back");
+            p_imu->Reset();
+            flg_reset = false;
+            continue;
+        }
+        g_LiDAR_frame_index++;
 
-            g_camera_lidar_queue.g_noise_cov_acc = p_imu->cov_acc;
-            g_camera_lidar_queue.g_noise_cov_gyro = p_imu->cov_gyr;
-            StatesGroup state_propagate(g_lio_state);
+        tim.tic("Preprocess");
+        double t0, t1, t2, t3, t4, t5, match_start, match_time, solve_start, solve_time, pca_time, svd_time;
+        match_time = 0;
 
-            // cout << "G_lio_state.last_update_time =  " << std::setprecision(10) << g_lio_state.last_update_time -g_lidar_star_tim  << endl;
-            if (feats_undistort->empty() || (feats_undistort == NULL))
-            {
-                frame_first_pt_time = Measures.lidar_beg_time;
-                std::cout << "not ready for odometry" << std::endl;
-                continue;
-            }
+        kdtree_search_time = 0;
+        solve_time = 0;
+        pca_time = 0;
+        svd_time = 0;
+        t0 = omp_get_wtime();
+        p_imu->Process(Measures, g_lio_state, feats_undistort);
 
-            if ((Measures.lidar_beg_time - frame_first_pt_time) < INIT_TIME)
-            {
-                flg_EKF_inited = false;
-                std::cout << "||||||||||Initiallizing LiDAR||||||||||" << std::endl;
-            }
-            else
-            {
-                flg_EKF_inited = true;
-            }
-            /*** Compute the euler angle ***/
-            Eigen::Vector3d euler_cur = RotMtoEuler(g_lio_state.rot_end);
+        g_camera_lidar_queue.g_noise_cov_acc = p_imu->cov_acc;
+        g_camera_lidar_queue.g_noise_cov_gyro = p_imu->cov_gyr;
+        StatesGroup state_propagate(g_lio_state);
+
+        // cout << "G_lio_state.last_update_time =  " << std::setprecision(10) << g_lio_state.last_update_time -g_lidar_star_tim  << endl;
+        if (feats_undistort->empty() || (feats_undistort == NULL))
+        {
+            frame_first_pt_time = Measures.lidar_beg_time;
+            std::cout << "not ready for odometry" << std::endl;
+            continue;
+        }
+
+        if ((Measures.lidar_beg_time - frame_first_pt_time) < INIT_TIME)
+        {
+            flg_EKF_inited = false;
+            std::cout << "||||||||||Initiallizing LiDAR||||||||||" << std::endl;
+        }
+        else
+        {
+            flg_EKF_inited = true;
+        }
+        /*** Compute the euler angle ***/
+        Eigen::Vector3d euler_cur = RotMtoEuler(g_lio_state.rot_end);
 #ifdef DEBUG_PRINT
-            std::cout << "current lidar time " << Measures.lidar_beg_time << " "
-                      << "first lidar time " << frame_first_pt_time << std::endl;
-            std::cout << "pre-integrated states: " << euler_cur.transpose() * 57.3 << " " << g_lio_state.pos_end.transpose() << " "
-                      << g_lio_state.vel_end.transpose() << " " << g_lio_state.bias_g.transpose() << " " << g_lio_state.bias_a.transpose()
-                      << std::endl;
+        std::cout << "current lidar time " << Measures.lidar_beg_time << " "
+                  << "first lidar time " << frame_first_pt_time << std::endl;
+        std::cout << "pre-integrated states: " << euler_cur.transpose() * 57.3 << " " << g_lio_state.pos_end.transpose() << " "
+                  << g_lio_state.vel_end.transpose() << " " << g_lio_state.bias_g.transpose() << " " << g_lio_state.bias_a.transpose()
+                  << std::endl;
 #endif
-            lasermap_fov_segment();
-            downSizeFilterSurf.setInputCloud(feats_undistort);
-            downSizeFilterSurf.filter(*feats_down);
-            //*feats_down = *feats_undistort ;
-            // cout <<"Preprocess cost time: " << tim.toc("Preprocess") << endl;
-            /*** initialize the map kdtree ***/
-            if ((feats_down->points.size() > 1) && (ikdtree.Root_Node == nullptr))
+        lasermap_fov_segment();
+        downSizeFilterSurf.setInputCloud(feats_undistort);
+        downSizeFilterSurf.filter(*feats_down);
+        //*feats_down = *feats_undistort ;
+        // cout <<"Preprocess cost time: " << tim.toc("Preprocess") << endl;
+        /*** initialize the map kdtree ***/
+        if ((feats_down->points.size() > 1) && (ikdtree.Root_Node == nullptr))
+        {
+            // std::vector<PointType> points_init = feats_down->points;
+            ikdtree.set_downsample_param(filter_size_map_min);
+            ikdtree.Build(feats_down->points);
+            flg_map_initialized = true;
+            continue;
+        }
+
+        if (ikdtree.Root_Node == nullptr)
+        {
+            flg_map_initialized = false;
+            std::cout << "~~~~~~~ Initialize Map iKD-Tree Failed! ~~~~~~~" << std::endl;
+            continue;
+        }
+        int featsFromMapNum = ikdtree.size();
+
+        int feats_down_size = feats_down->points.size();
+
+        /*** ICP and iterated Kalman filter update ***/
+        PointCloudXYZINormal::Ptr coeffSel_tmpt(new PointCloudXYZINormal(*feats_down));
+        PointCloudXYZINormal::Ptr feats_down_updated(new PointCloudXYZINormal(*feats_down));
+        std::vector<double> res_last(feats_down_size, 1000.0);
+        std::vector<double> res_not_abs(feats_down_size, 1000.0); // initial
+
+        if (featsFromMapNum >= 5)
+        {
+            t1 = omp_get_wtime();
+
+            if (m_if_publish_feature_map)
             {
-                // std::vector<PointType> points_init = feats_down->points;
-                ikdtree.set_downsample_param(filter_size_map_min);
-                ikdtree.Build(feats_down->points);
-                flg_map_initialized = true;
-                continue;
+                PointVector().swap(ikdtree.PCL_Storage);
+                ikdtree.flatten(ikdtree.Root_Node, ikdtree.PCL_Storage, NOT_RECORD);
+                featsFromMap->clear();
+                featsFromMap->points = ikdtree.PCL_Storage;
+
+                sensor_msgs::PointCloud2 laserCloudMap;
+                pcl::toROSMsg(*featsFromMap, laserCloudMap);
+                laserCloudMap.header.stamp = ros::Time::now(); // ros::Time().fromSec(last_timestamp_lidar);
+                // laserCloudMap.header.stamp.fromSec(Measures.lidar_end_time); // ros::Time().fromSec(last_timestamp_lidar);
+                laserCloudMap.header.frame_id = "world";
+                pubLaserCloudMap.publish(laserCloudMap);
             }
 
-            if (ikdtree.Root_Node == nullptr)
-            {
-                flg_map_initialized = false;
-                std::cout << "~~~~~~~ Initialize Map iKD-Tree Failed! ~~~~~~~" << std::endl;
-                continue;
-            }
-            int featsFromMapNum = ikdtree.size();
+            std::vector<bool> point_selected_surf(feats_down_size, true);
+            std::vector<std::vector<int>> pointSearchInd_surf(feats_down_size);
+            std::vector<PointVector> Nearest_Points(feats_down_size);
 
-            int feats_down_size = feats_down->points.size();
+            int rematch_num = 0;
+            bool rematch_en = 0;
+            flg_EKF_converged = 0;
+            deltaR = 0.0;
+            deltaT = 0.0;
+            t2 = omp_get_wtime();
+            double maximum_pt_range = 0.0;
+            // cout <<"Preprocess 2 cost time: " << tim.toc("Preprocess") << endl;
 
-            /*** ICP and iterated Kalman filter update ***/
-            PointCloudXYZINormal::Ptr coeffSel_tmpt(new PointCloudXYZINormal(*feats_down));
-            PointCloudXYZINormal::Ptr feats_down_updated(new PointCloudXYZINormal(*feats_down));
-            std::vector<double> res_last(feats_down_size, 1000.0); // initial
 
-            if (featsFromMapNum >= 5)
-            {
-                t1 = omp_get_wtime();
-
-                if (m_if_publish_feature_map)
+                tim.tic("Iter");
+                
+                match_start = omp_get_wtime();
+                laserCloudOri->clear();
+                coeffSel->clear();
+                std::vector<PointType> surface_points;
+                std::vector<PointType> surface_points_normals;
+                match_start = omp_get_wtime();
+                laserCloudOri->clear();
+                coeffSel->clear();
+                /** closest surface search and residual computation **/
+                for (int i = 0; i < feats_down_size; i += m_lio_update_point_step)
                 {
-                    PointVector().swap(ikdtree.PCL_Storage);
-                    ikdtree.flatten(ikdtree.Root_Node, ikdtree.PCL_Storage, NOT_RECORD);
-                    featsFromMap->clear();
-                    featsFromMap->points = ikdtree.PCL_Storage;
 
-                    sensor_msgs::PointCloud2 laserCloudMap;
-                    pcl::toROSMsg(*featsFromMap, laserCloudMap);
-                    laserCloudMap.header.stamp = ros::Time::now(); // ros::Time().fromSec(last_timestamp_lidar);
-                    // laserCloudMap.header.stamp.fromSec(Measures.lidar_end_time); // ros::Time().fromSec(last_timestamp_lidar);
-                    laserCloudMap.header.frame_id = "world";
-                    pubLaserCloudMap.publish(laserCloudMap);
+                    double search_start = omp_get_wtime();
+                    PointType &pointOri_tmpt = feats_down->points[i];
+                    double ori_pt_dis =
+                        sqrt(pointOri_tmpt.x * pointOri_tmpt.x + pointOri_tmpt.y * pointOri_tmpt.y + pointOri_tmpt.z * pointOri_tmpt.z);
+                    maximum_pt_range = std::max(ori_pt_dis, maximum_pt_range);
+                    PointType &pointSel_tmpt = feats_down_updated->points[i];
+
+                    /* transform to world frame */
+                    pointBodyToWorld(&pointOri_tmpt, &pointSel_tmpt);
+                    std::vector<float> pointSearchSqDis_surf;
+
+                    auto &points_near = Nearest_Points[i];
+
+                    point_selected_surf[i] = true;
+                    /** Find the closest surfaces in the map **/
+                    ikdtree.Nearest_Search(pointSel_tmpt, NUM_MATCH_POINTS, points_near, pointSearchSqDis_surf);
+                    float max_distance = pointSearchSqDis_surf[NUM_MATCH_POINTS - 1];
+                    //  max_distance to add residuals
+                    // ANCHOR - Long range pt stragetry
+                    if (max_distance > m_maximum_pt_kdtree_dis)
+                    {
+                        point_selected_surf[i] = false;
+                    }
+
+                    kdtree_search_time += omp_get_wtime() - search_start;
+                    if (point_selected_surf[i] == false)
+                        continue;
+
+                    // match_time += omp_get_wtime() - match_start;
+                    double pca_start = omp_get_wtime();
+                    /// PCA (using minimum square method)
+                    cv::Mat matA0(NUM_MATCH_POINTS, 3, CV_32F, cv::Scalar::all(0));
+                    cv::Mat matB0(NUM_MATCH_POINTS, 1, CV_32F, cv::Scalar::all(-1));
+                    // cv::Mat matX0( NUM_MATCH_POINTS, 1, CV_32F, cv::Scalar::all( 0 ) );
+                    cv::Mat matX0(3, 1, CV_32F, cv::Scalar::all(0));
+
+                    for (int j = 0; j < NUM_MATCH_POINTS; j++)
+                    {
+                        matA0.at<float>(j, 0) = points_near[j].x;
+                        matA0.at<float>(j, 1) = points_near[j].y;
+                        matA0.at<float>(j, 2) = points_near[j].z;
+                    }
+
+                    cv::solve(matA0, matB0, matX0, cv::DECOMP_QR); // TODO
+
+                    float pa = matX0.at<float>(0, 0);
+                    float pb = matX0.at<float>(1, 0);
+                    float pc = matX0.at<float>(2, 0);
+                    float pd = 1;
+
+                    float ps = sqrt(pa * pa + pb * pb + pc * pc);
+                    pa /= ps;
+                    pb /= ps;
+                    pc /= ps;
+                    pd /= ps;
+
+                    bool planeValid = true;
+                    for (int j = 0; j < NUM_MATCH_POINTS; j++)
+                    {
+                        // ANCHOR -  Planar check
+                        if (fabs(pa * points_near[j].x + pb * points_near[j].y + pc * points_near[j].z + pd) >
+                            m_planar_check_dis) // Raw 0.05
+                        {
+                            // ANCHOR - Far distance pt processing
+                            if (ori_pt_dis < maximum_pt_range * 0.90 || (ori_pt_dis < m_long_rang_pt_dis))
+                            // if(1)
+                            {
+                                planeValid = false;
+                                point_selected_surf[i] = false;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (planeValid)
+                    {
+                        float pd2 = pa * pointSel_tmpt.x + pb * pointSel_tmpt.y + pc * pointSel_tmpt.z + pd;
+                        float s = 1 - 0.9 * fabs(pd2) /
+                                          sqrt(sqrt(pointSel_tmpt.x * pointSel_tmpt.x + pointSel_tmpt.y * pointSel_tmpt.y +
+                                                    pointSel_tmpt.z * pointSel_tmpt.z));
+                        // ANCHOR -  Point to plane distance
+                        double acc_distance = (ori_pt_dis < m_long_rang_pt_dis) ? m_maximum_res_dis : 1.0;
+                        if (pd2 < acc_distance)
+                        {
+                            // if(std::abs(pd2) > 5 * res_mean_last)
+                            // {
+                            //     point_selected_surf[i] = false;
+                            //     res_last[i] = 0.0;
+                            //     continue;
+                            // }
+
+                            surface_points.push_back(pointOri_tmpt);
+
+                            point_selected_surf[i] = true;
+                            coeffSel_tmpt->points[i].x = pa;
+                            coeffSel_tmpt->points[i].y = pb;
+                            coeffSel_tmpt->points[i].z = pc;
+                            coeffSel_tmpt->points[i].intensity = pd;
+                            res_last[i] = std::abs(pd2);
+                            res_not_abs[i] = pd2;
+                            surface_points_normals.push_back(coeffSel_tmpt->points[i]);
+                        }
+                        else
+                        {
+                            point_selected_surf[i] = false;
+                        }
+                    }
+                    pca_time += omp_get_wtime() - pca_start;
                 }
 
-                std::vector<bool> point_selected_surf(feats_down_size, true);
-                std::vector<std::vector<int>> pointSearchInd_surf(feats_down_size);
-                std::vector<PointVector> Nearest_Points(feats_down_size);
-
-                int rematch_num = 0;
-                bool rematch_en = 0;
-                flg_EKF_converged = 0;
-                deltaR = 0.0;
-                deltaT = 0.0;
-                t2 = omp_get_wtime();
-                double maximum_pt_range = 0.0;
-                // cout <<"Preprocess 2 cost time: " << tim.toc("Preprocess") << endl;
-                 PointCloudXYZINormal::Ptr first_scan(new PointCloudXYZINormal(*feats_down));
-                for (iterCount = 0; iterCount < NUM_MAX_ITERATIONS; iterCount++)
+                /** closest surface search and residual computation **/
+               
+                std::vector<int> best_agree_points;
+                double best_num_agree = 0;
+                for (int ransac_iter = 0; ransac_iter < 100; ransac_iter++)
                 {
-        
-                    tim.tic("Iter");
-                    match_start = omp_get_wtime();
-                    laserCloudOri->clear();
-                    coeffSel->clear();
+                if (!flg_EKF_inited)
+                {
 
-                    /** closest surface search and residual computation **/
-                    for (int i = 0; i < feats_down_size; i += m_lio_update_point_step)
+
+
+                    break ; 
+                }
+
+
+                    
+                    
+                    StatesGroup ransac_state  = g_lio_state;
+
+                    std::set<int> selected_ind;
+                    
+
+
+
+                    while (selected_ind.size() < 3)
                     {
-                        if(iterCount == 0 && iter_counter == 1 )
-                    {
-                         pointBodyToWorld(&(feats_down->points[i]), &(first_scan->points[i]));
+                        int ind = 1 + std::rand() / ((RAND_MAX + 1u) / surface_points.size());
+
+
+                        selected_ind.insert(ind);
                     }
-                
-                        double search_start = omp_get_wtime();
-                        PointType &pointOri_tmpt = feats_down->points[i];
-                        double ori_pt_dis =
-                            sqrt(pointOri_tmpt.x * pointOri_tmpt.x + pointOri_tmpt.y * pointOri_tmpt.y + pointOri_tmpt.z * pointOri_tmpt.z);
-                        maximum_pt_range = std::max(ori_pt_dis, maximum_pt_range);
-                        PointType &pointSel_tmpt = feats_down_updated->points[i];
-
-                        /* transform to world frame */
-                        pointBodyToWorld(&pointOri_tmpt, &pointSel_tmpt);
-                        std::vector<float> pointSearchSqDis_surf;
-
-                        auto &points_near = Nearest_Points[i];
-
-                        if (iterCount == 0 || rematch_en)
-                        {
-                            point_selected_surf[i] = true;
-                            /** Find the closest surfaces in the map **/
-                            ikdtree.Nearest_Search(pointSel_tmpt, NUM_MATCH_POINTS, points_near, pointSearchSqDis_surf);
-                            float max_distance = pointSearchSqDis_surf[NUM_MATCH_POINTS - 1];
-                            //  max_distance to add residuals
-                            // ANCHOR - Long range pt stragetry
-                            if (max_distance > m_maximum_pt_kdtree_dis)
-                            {
-                                point_selected_surf[i] = false;
-                            }
-                        }
-
-                        kdtree_search_time += omp_get_wtime() - search_start;
-                        if (point_selected_surf[i] == false)
-                            continue;
-
-                        // match_time += omp_get_wtime() - match_start;
-                        double pca_start = omp_get_wtime();
-                        /// PCA (using minimum square method)
-                        cv::Mat matA0(NUM_MATCH_POINTS, 3, CV_32F, cv::Scalar::all(0));
-                        cv::Mat matB0(NUM_MATCH_POINTS, 1, CV_32F, cv::Scalar::all(-1));
-                        // cv::Mat matX0( NUM_MATCH_POINTS, 1, CV_32F, cv::Scalar::all( 0 ) );
-                        cv::Mat matX0(3, 1, CV_32F, cv::Scalar::all(0));
-
-                        for (int j = 0; j < NUM_MATCH_POINTS; j++)
-                        {
-                            matA0.at<float>(j, 0) = points_near[j].x;
-                            matA0.at<float>(j, 1) = points_near[j].y;
-                            matA0.at<float>(j, 2) = points_near[j].z;
-                        }
-
-                        cv::solve(matA0, matB0, matX0, cv::DECOMP_QR); // TODO
-
-                        float pa = matX0.at<float>(0, 0);
-                        float pb = matX0.at<float>(1, 0);
-                        float pc = matX0.at<float>(2, 0);
-                        float pd = 1;
-
-                        float ps = sqrt(pa * pa + pb * pb + pc * pc);
-                        pa /= ps;
-                        pb /= ps;
-                        pc /= ps;
-                        pd /= ps;
-
-                        bool planeValid = true;
-                        for (int j = 0; j < NUM_MATCH_POINTS; j++)
-                        {
-                            // ANCHOR -  Planar check
-                            if (fabs(pa * points_near[j].x + pb * points_near[j].y + pc * points_near[j].z + pd) >
-                                m_planar_check_dis) // Raw 0.05
-                            {
-                                // ANCHOR - Far distance pt processing
-                                if (ori_pt_dis < maximum_pt_range * 0.90 || (ori_pt_dis < m_long_rang_pt_dis))
-                                // if(1)
-                                {
-                                    planeValid = false;
-                                    point_selected_surf[i] = false;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (planeValid)
-                        {
-                            float pd2 = pa * pointSel_tmpt.x + pb * pointSel_tmpt.y + pc * pointSel_tmpt.z + pd;
-                            float s = 1 - 0.9 * fabs(pd2) /
-                                              sqrt(sqrt(pointSel_tmpt.x * pointSel_tmpt.x + pointSel_tmpt.y * pointSel_tmpt.y +
-                                                        pointSel_tmpt.z * pointSel_tmpt.z));
-                            // ANCHOR -  Point to plane distance
-                            double acc_distance = (ori_pt_dis < m_long_rang_pt_dis) ? m_maximum_res_dis : 1.0;
-                            if (pd2 < acc_distance)
-                            {
-                                // if(std::abs(pd2) > 5 * res_mean_last)
-                                // {
-                                //     point_selected_surf[i] = false;
-                                //     res_last[i] = 0.0;
-                                //     continue;
-                                // }
-                                point_selected_surf[i] = true;
-                                coeffSel_tmpt->points[i].x = pa;
-                                coeffSel_tmpt->points[i].y = pb;
-                                coeffSel_tmpt->points[i].z = pc;
-                                coeffSel_tmpt->points[i].intensity = pd2;
-                                res_last[i] = std::abs(pd2);
-                            }
-                            else
-                            {
-                                point_selected_surf[i] = false;
-                            }
-                        }
-                        pca_time += omp_get_wtime() - pca_start;
-                    }
-                    tim.tic("Stack");
-
-                    double total_residual = 0.0;
-                    laserCloudSelNum = 0;
-
-                    for (int i = 0; i < coeffSel_tmpt->points.size(); i++)
-                    {
-                        if (point_selected_surf[i] && (res_last[i] <= 2.0))
-                        {
-                            laserCloudOri->push_back(feats_down->points[i]);
-                            coeffSel->push_back(coeffSel_tmpt->points[i]);
-                            total_residual += res_last[i];
-                            if (res_max < res_last[i])
-                            {
-                                res_max = res_last[i];
-                            }
-                            laserCloudSelNum++;
-                        }
-                    }
-                    res_mean_last = total_residual / laserCloudSelNum;
-                    outfile << res_max << std::endl;
-                    res_max = -1;
-
-                    match_time += omp_get_wtime() - match_start;
-                    solve_start = omp_get_wtime();
-
+                    //until converge
                     /*** Computation of Measuremnt Jacobian matrix H and measurents vector ***/
-                    Eigen::MatrixXd Hsub(laserCloudSelNum, 6);
-                    Eigen::VectorXd meas_vec(laserCloudSelNum);
-                    Hsub.setZero();
+                    
+   
 
-                    for (int i = 0; i < laserCloudSelNum; i++)
+                    for( int  j = 0 ;j< 20 ; j++)
                     {
-                        const PointType &laser_p = laserCloudOri->points[i];
+                    Eigen::MatrixXd Hsub(3, 6);
+                    Eigen::VectorXd meas_vec(3);
+                    Hsub.setZero();
+                    
+                    int count = 0 ;
+
+                    for (int i : selected_ind)
+                    {
+
+                        PointType laser_p  ; 
+                        pointBodyToWorldState(&surface_points[i] ,&laser_p , ransac_state  ) ; 
                         Eigen::Vector3d point_this(laser_p.x, laser_p.y, laser_p.z);
-                        point_this += g_lio_state.pos_ext_i2l;
+                        point_this += ransac_state.pos_ext_i2l;
                         Eigen::Matrix3d point_crossmat;
                         point_crossmat << SKEW_SYM_MATRIX(point_this);
 
                         /*** get the normal vector of closest surface/corner ***/
-                        const PointType &norm_p = coeffSel->points[i];
+                        const PointType &norm_p = surface_points_normals[i];
                         Eigen::Vector3d norm_vec(norm_p.x, norm_p.y, norm_p.z);
-
+                        
                         /*** calculate the Measuremnt Jacobian matrix H ***/
-                        Eigen::Vector3d A(point_crossmat * g_lio_state.rot_end.transpose() * norm_vec);
-                        Hsub.row(i) << VEC_FROM_ARRAY(A), norm_p.x, norm_p.y, norm_p.z;
+                        Eigen::Vector3d A(point_crossmat * ransac_state.rot_end.transpose() * norm_vec);
+                        Hsub.row(count) << VEC_FROM_ARRAY(A), norm_p.x, norm_p.y, norm_p.z;
 
                         /*** Measuremnt: distance to the closest surface/corner ***/
-                        meas_vec(i) = -norm_p.intensity;
+                        double res  = norm_p.x * laser_p.x + norm_p.y * laser_p.y + norm_p.z * laser_p.z + norm_p.intensity;  
+                        //res = std::abs(res) ; 
+                        meas_vec(count) = -1*res;
+                        count++ ; 
                     }
+                        
+
 
                     Eigen::Vector3d rot_add, t_add, v_add, bg_add, ba_add, g_add;
                     Eigen::Matrix<double, DIM_OF_STATES, 1> solution;
-                    Eigen::MatrixXd K(DIM_OF_STATES, laserCloudSelNum);
+                    Eigen::MatrixXd K(DIM_OF_STATES, 3);
+                     /*** Iterative Kalman Filter Update ***/
+                    auto &&Hsub_T = Hsub.transpose();
+                    H_T_H.block<6, 6>(0, 0) = Hsub_T * Hsub;
+                    Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> &&K_1 =
+                    (H_T_H + (ransac_state.cov / LASER_POINT_COV).inverse()).inverse();
+                    K = K_1.block<DIM_OF_STATES, 6>(0, 0) * Hsub_T;
+                    auto vec = state_propagate - ransac_state;
+                    solution = K * (meas_vec - Hsub * vec.block<6, 1>(0, 0));
+                    ransac_state = state_propagate + solution;
+                    ransac_state = ransac_state.normalize_if_large(1);
+                    rot_add = solution.block<3, 1>(0, 0);
+                    t_add = solution.block<3, 1>(3, 0);
+                    // flg_EKF_converged = false;
 
-                    /*** Iterative Kalman Filter Update ***/
-                    if (!flg_EKF_inited)
-                    {
-                        cout << ANSI_COLOR_RED_BOLD << "Run EKF init" << ANSI_COLOR_RESET << endl;
-                        /*** only run in initialization period ***/
-                        set_initial_state_cov(g_lio_state);
+                    deltaR = rot_add.norm() * 57.3;
+                    deltaT = t_add.norm() * 100;
                     }
-                    else
+                    // after converge
+                    std::vector<int> agree_points;
+                    double num_agree = 0;
+                    // check how many points agree
+                    for (int i = 0; i < surface_points.size(); i++)
                     {
-                        // cout << ANSI_COLOR_RED_BOLD << "Run EKF uph" << ANSI_COLOR_RESET << endl;
-                        auto &&Hsub_T = Hsub.transpose();
-                        H_T_H.block<6, 6>(0, 0) = Hsub_T * Hsub;
-                        Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> &&K_1 =
-                            (H_T_H + (g_lio_state.cov / LASER_POINT_COV).inverse()).inverse();
-                        K = K_1.block<DIM_OF_STATES, 6>(0, 0) * Hsub_T;
 
-                        auto vec = state_propagate - g_lio_state;
-                        solution = K * (meas_vec - Hsub * vec.block<6, 1>(0, 0));
 
-                        // double speed_delta = solution.block( 0, 6, 3, 1 ).norm();
-                        // if(solution.block( 0, 6, 3, 1 ).norm() > 0.05 )
-                        // {
-                        //     solution.block( 0, 6, 3, 1 ) = solution.block( 0, 6, 3, 1 ) / speed_delta * 0.05;
-                        // }
-
-                        g_lio_state = state_propagate + solution;
-                        g_lio_state = g_lio_state.normalize_if_large(1);
-                        static std::ofstream myfile = std::ofstream("/catkin_ws/src/r3live/data/L515/new_state.txt", ios::app);
-                        myfile << g_lio_state.to_string(g_lio_state, "STATE_LIO") << "\n";
-
-                        print_dash_board();
-                        // cout << ANSI_COLOR_RED_BOLD << "Run EKF uph, vec = " << vec.head<9>().transpose() << ANSI_COLOR_RESET << endl;
-                        rot_add = solution.block<3, 1>(0, 0);
-                        t_add = solution.block<3, 1>(3, 0);
-                        flg_EKF_converged = false;
-                        if (((rot_add.norm() * 57.3 - deltaR) < 0.01) && ((t_add.norm() * 100 - deltaT) < 0.015))
+                        PointType laser_p  ; 
+                        pointBodyToWorldState(&surface_points[i] ,&laser_p ,  ransac_state  ) ;
+                        const PointType &norm_p = surface_points_normals[i];
+                        Eigen::Vector3d norm_vec(norm_p.x, norm_p.y, norm_p.z); 
+                        double res = laser_p.x * surface_points_normals[i].x + laser_p.y * surface_points_normals[i].y + surface_points_normals[i].z * laser_p.z + norm_p.intensity ;
+                        if (std::abs(res) < 0.05)
                         {
-                            flg_EKF_converged = true;
+                            num_agree++;
+                            agree_points.push_back(i);
                         }
-
-                        deltaR = rot_add.norm() * 57.3;
-                        deltaT = t_add.norm() * 100;
                     }
 
-                    // printf_line;
+                    if (best_num_agree < num_agree)
+                    {
+                        best_agree_points.clear();
+                        best_agree_points = agree_points;
+                        best_num_agree = num_agree;
+                    }
+    
+                }
+
+
+
+
+
+
+
+                for( int j = 0 ; j<20 ; j++)
+                {
+
+
+
+                Eigen::MatrixXd Hsub(best_agree_points.size(), 6);
+                Eigen::VectorXd meas_vec(best_agree_points.size());
+                Hsub.setZero();
+                for (int index = 0; index < best_agree_points.size(); index++)
+                {
+                    int i = best_agree_points[index];
+
+                    PointType laser_p ; 
+                    pointBodyToWorld(&surface_points[i] , &laser_p   ) ; 
+                    Eigen::Vector3d point_this(laser_p.x, laser_p.y, laser_p.z);
+                    point_this += g_lio_state.pos_ext_i2l;
+                    Eigen::Matrix3d point_crossmat;
+                    point_crossmat << SKEW_SYM_MATRIX(point_this);
+
+                    /*** get the normal vector of closest surface/corner ***/
+                    const PointType &norm_p = surface_points_normals[i];
+                    Eigen::Vector3d norm_vec(norm_p.x, norm_p.y, norm_p.z);
+
+                    /*** calculate the Measuremnt Jacobian matrix H ***/
+                    Eigen::Vector3d A(point_crossmat * g_lio_state.rot_end.transpose() * norm_vec);
+                    Hsub.row(index) << VEC_FROM_ARRAY(A), norm_p.x, norm_p.y, norm_p.z;
+
+                    /*** Measuremnt: distance to the closest surface/corner ***/
+                    double res  = norm_p.x * laser_p.x + norm_p.y * laser_p.y + norm_p.z * laser_p.z + norm_p.intensity  ;  
+                    //res = std::abs(res) ; 
+                    meas_vec(index)  = -1*res;
+
+                }
+
+
+
+
+                Eigen::Vector3d rot_add, t_add, v_add, bg_add, ba_add, g_add;
+                Eigen::Matrix<double, DIM_OF_STATES, 1> solution;
+                Eigen::MatrixXd K(DIM_OF_STATES, best_agree_points.size());
+                if (!flg_EKF_inited)
+                {
+                    cout << ANSI_COLOR_RED_BOLD << "Run EKF init" << ANSI_COLOR_RESET << endl;
+                    /*** only run in initialization period ***/
+                    set_initial_state_cov(g_lio_state);
+                }
+                else
+                {
+                    auto &&Hsub_T = Hsub.transpose();
+                    H_T_H.block<6, 6>(0, 0) = Hsub_T * Hsub;
+                    Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> &&K_1 = (H_T_H + (g_lio_state.cov / LASER_POINT_COV).inverse()).inverse();
+
+                    K = K_1.block<DIM_OF_STATES, 6>(0, 0) * Hsub_T;
+
+                    auto vec = state_propagate - g_lio_state;
+                    solution = K * (meas_vec - Hsub * vec.block<6, 1>(0, 0));
+
+                    g_lio_state = state_propagate + solution;
+                    g_lio_state = g_lio_state.normalize_if_large(1);
+
+
+                    if(j==19)
+                    {
+
+                    //for(int iter = 0 ; iter < meas_vec.size() ; iter++)
+                    //{
+                    //outfile<< std::setprecision(9) << meas_vec(iter) << std::endl ; 
+                    //}
                     g_lio_state.last_update_time = Measures.lidar_end_time;
-                    euler_cur = RotMtoEuler(g_lio_state.rot_end);
-                    dump_lio_state_to_log(m_lio_state_fp);
-
-                    /*** Rematch Judgement ***/
-                    rematch_en = false;
-                    if (flg_EKF_converged || ((rematch_num == 0) && (iterCount == (NUM_MAX_ITERATIONS - 2))))
-                    {
-                        rematch_en = true;
-                        rematch_num++;
-                    }
-
-                    /*** Convergence Judgements and Covariance Update ***/
-                    // if (rematch_num >= 10 || (iterCount == NUM_MAX_ITERATIONS - 1))
-                    if (rematch_num >= 2 || (iterCount == NUM_MAX_ITERATIONS - 1)) // Fast lio ori version.
-                    {
-                        if (flg_EKF_inited)
-                        {
-                            /*** Covariance Update ***/
-                            G.block<DIM_OF_STATES, 6>(0, 0) = K * Hsub;
-                            g_lio_state.cov = (I_STATE - G) * g_lio_state.cov;
-                            total_distance += (g_lio_state.pos_end - position_last).norm();
-                            position_last = g_lio_state.pos_end;
-
-                            // std::cout << "position: " << g_lio_state.pos_end.transpose() << " total distance: " << total_distance << std::endl;
-                        }
-                        solve_time += omp_get_wtime() - solve_start;
-                        break;
-                    }
+                    euler_cur = RotMtoEuler( g_lio_state.rot_end );
+                    dump_lio_state_to_log( m_lio_state_fp );
+                    G.block<DIM_OF_STATES, 6>(0, 0) = K * Hsub;
+                    g_lio_state.cov = (I_STATE - G) * g_lio_state.cov;
+                    position_last = g_lio_state.pos_end;
                     solve_time += omp_get_wtime() - solve_start;
-                    // cout << "Match cost time: " << match_time * 1000.0
-                    //      << ", search cost time: " << kdtree_search_time*1000.0
-                    //      << ", PCA cost time: " << pca_time*1000.0
-                    //      << ", solver_cost: " << solve_time * 1000.0 << endl;
-                    // cout <<"Iter cost time: " << tim.toc("Iter") << endl;
+                    }
+                }
+
+
+
+
                 
-
-
-
-
-
-                }
-
-                t3 = omp_get_wtime();
-
-                /*** add new frame points to map ikdtree ***/
-                PointVector points_history;
-                ikdtree.acquire_removed_points(points_history);
-
-                memset(cube_updated, 0, sizeof(cube_updated));
-
-                for (int i = 0; i < points_history.size(); i++)
-                {
-                    PointType &pointSel = points_history[i];
-
-                    int cubeI = int((pointSel.x + 0.5 * cube_len) / cube_len) + laserCloudCenWidth;
-                    int cubeJ = int((pointSel.y + 0.5 * cube_len) / cube_len) + laserCloudCenHeight;
-                    int cubeK = int((pointSel.z + 0.5 * cube_len) / cube_len) + laserCloudCenDepth;
-
-                    if (pointSel.x + 0.5 * cube_len < 0)
-                        cubeI--;
-                    if (pointSel.y + 0.5 * cube_len < 0)
-                        cubeJ--;
-                    if (pointSel.z + 0.5 * cube_len < 0)
-                        cubeK--;
-
-                    if (cubeI >= 0 && cubeI < laserCloudWidth && cubeJ >= 0 && cubeJ < laserCloudHeight && cubeK >= 0 && cubeK < laserCloudDepth)
-                    {
-                        int cubeInd = cubeI + laserCloudWidth * cubeJ + laserCloudWidth * laserCloudHeight * cubeK;
-                        featsArray[cubeInd]->push_back(pointSel);
-                    }
-                }
-                PointCloudXYZINormal::Ptr points_to_add(new PointCloudXYZINormal());
-                double counter_new = 0;
-                // std::ofstream outfile;
-                //  outfile.open("/residual.txt");
-
-                for (int i = 0; i < feats_down_size; i++)
-                {
-                    /* transform to world frame */
-
-                    pointBodyToWorld(&(feats_down->points[i]), &(feats_down_updated->points[i]));
-                    if (res_last[i] <= 0.02 || !point_selected_surf[i] || res_last[i]> 2 )
-                    {
-                        points_to_add->push_back(feats_down_updated->points[i]);
-                        // outfile << std::setprecision(9) << res_last[i] << std::endl;
-                        counter_new++;
-                    }
-                }
-
-                t4 = omp_get_wtime();
-                if (iter_counter == 1)
-                {
-                    pcl::io::savePCDFileBinary("/last.pcd", *feats_down_updated);
-                    m_map_rgb_pts.save_to_pcd("/", "map.pcd");
-                    pcl::io::savePCDFileBinary("/start.pcd", *first_scan);
-                }
-                ikdtree.Add_Points(points_to_add->points, true);
-                kdtree_incremental_time = omp_get_wtime() - t4 + readd_time + readd_box_time + delete_box_time;
-                t5 = omp_get_wtime();
             }
 
+                t3 = omp_get_wtime();
+                /*** add new frame points to map ikdtree ***/
+                PointVector points_history;
+                ikdtree.acquire_removed_points( points_history );
+            
+                memset( cube_updated, 0, sizeof( cube_updated ) );
+
+                for ( int i = 0; i < points_history.size(); i++ )
+                {
+                    PointType &pointSel = points_history[ i ];
+
+                    int cubeI = int( ( pointSel.x + 0.5 * cube_len ) / cube_len ) + laserCloudCenWidth;
+                    int cubeJ = int( ( pointSel.y + 0.5 * cube_len ) / cube_len ) + laserCloudCenHeight;
+                    int cubeK = int( ( pointSel.z + 0.5 * cube_len ) / cube_len ) + laserCloudCenDepth;
+
+                    if ( pointSel.x + 0.5 * cube_len < 0 )
+                        cubeI--;
+                    if ( pointSel.y + 0.5 * cube_len < 0 )
+                        cubeJ--;
+                    if ( pointSel.z + 0.5 * cube_len < 0 )
+                        cubeK--;
+
+                    if ( cubeI >= 0 && cubeI < laserCloudWidth && cubeJ >= 0 && cubeJ < laserCloudHeight && cubeK >= 0 && cubeK < laserCloudDepth )
+                    {
+                        int cubeInd = cubeI + laserCloudWidth * cubeJ + laserCloudWidth * laserCloudHeight * cubeK;
+                        featsArray[ cubeInd ]->push_back( pointSel );
+                    }
+                }
+
+                for ( int i = 0; i < feats_down_size; i++ )
+                {
+                    /* transform to world frame */
+                    pointBodyToWorld( &( feats_down->points[ i ] ), &( feats_down_updated->points[ i ] ) );
+                }
+                t4 = omp_get_wtime();
+               
+                ikdtree.Add_Points( feats_down_updated->points, true );
+                
+                kdtree_incremental_time = omp_get_wtime() - t4 + readd_time + readd_box_time + delete_box_time;
+                t5 = omp_get_wtime();
+
+
+
+
+
+
+
+ 
             /******* Publish current frame points in world coordinates:  *******/
             laserCloudFullRes2->clear();
             *laserCloudFullRes2 = dense_map_en ? (*feats_undistort) : (*feats_down);
@@ -1176,8 +1243,6 @@ int R3LIVE::service_LIO_update()
             time_log_counter++;
             fprintf(m_lio_costtime_fp, "%.5f %.5f\r\n", g_lio_state.last_update_time - g_camera_lidar_queue.m_first_imu_time, t5 - t0);
             fflush(m_lio_costtime_fp);
-
-
         }
         status = ros::ok();
         rate.sleep();
@@ -1186,7 +1251,8 @@ int R3LIVE::service_LIO_update()
         std::cout << "Time difference_lio = " << moving_avg_lio << "[ms]" << std::endl;
         std::cout << "points_size " << Measures.lidar->size() << std::endl;
         iter_counter++;
+        outfile.close(); 
     }
-    outfile.close();
     return 0;
 }
+

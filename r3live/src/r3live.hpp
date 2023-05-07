@@ -261,7 +261,7 @@ public:
     Global_map m_map_rgb_pts;
     int m_maximum_image_buffer = 2;
     int m_track_windows_size = 50;
-    double m_minumum_rgb_pts_size = 0.05;
+    double m_minumum_rgb_pts_size = 0.15;
     double m_vio_image_width = 0;
     double m_vio_image_heigh = 0;
     int m_if_estimate_i2c_extrinsic = 1;
@@ -438,7 +438,7 @@ public:
         XAxisPoint_body = Eigen::Vector3f(LIDAR_SP_LEN, 0.0, 0.0);
         XAxisPoint_world = Eigen::Vector3f(LIDAR_SP_LEN, 0.0, 0.0);
 
-        downSizeFilterSurf.setLeafSize(0.1, 0.1, 0.1);
+        downSizeFilterSurf.setLeafSize(m_voxel_downsample_size_surf, m_voxel_downsample_size_surf, m_voxel_downsample_size_axis_z);
         downSizeFilterMap.setLeafSize(filter_size_map_min, filter_size_map_min, filter_size_map_min);
 
         m_lio_state_fp = fopen( std::string(m_map_output_dir).append("/lic_lio.log").c_str(), "w+");
@@ -450,7 +450,7 @@ public:
 
     //project lidar frame to world
     void pointBodyToWorld(PointType const *const pi, PointType *const po);
-
+    void pointBodyToWorldState(PointType const *const pi, PointType *const po ,StatesGroup  curr_state ) ; 
     template <typename T>
     void pointBodyToWorld(const Eigen::Matrix<T, 3, 1> &pi, Eigen::Matrix<T, 3, 1> &po)
     {
@@ -460,6 +460,7 @@ public:
         po[1] = p_global(1);
         po[2] = p_global(2);
     }
+    
     void RGBpointBodyToWorld(PointType const *const pi, pcl::PointXYZI *const po);
     int get_cube_index(const int &i, const int &j, const int &k);
     bool center_in_FOV(Eigen::Vector3f cube_p);
