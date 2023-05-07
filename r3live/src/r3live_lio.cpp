@@ -887,7 +887,7 @@ int R3LIVE::service_LIO_update()
                     //until converge
                     /*** Computation of Measuremnt Jacobian matrix H and measurents vector ***/
                     
-
+   
 
                     for( int  j = 0 ;j< 20 ; j++)
                     {
