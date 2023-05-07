@@ -857,7 +857,7 @@ int R3LIVE::service_LIO_update()
                
                 std::vector<int> best_agree_points;
                 double best_num_agree = 0;
-                for (int ransac_iter = 0; ransac_iter < 100; ransac_iter++)
+                for (int ransac_iter = 0; ransac_iter < 500; ransac_iter++)
                 {
                 if (!flg_EKF_inited)
                 {
@@ -972,6 +972,8 @@ int R3LIVE::service_LIO_update()
     
                 }
 
+                std::cout << "hhhhhhhhhhhhhh" << best_num_agree  << "  " << surface_points_normals.size() << std::endl;
+
 
 
 
@@ -1034,7 +1036,16 @@ int R3LIVE::service_LIO_update()
                     g_lio_state = g_lio_state.normalize_if_large(1);
 
 
-
+                    if(j==19)
+                    {
+                    g_lio_state.last_update_time = Measures.lidar_end_time;
+                    euler_cur = RotMtoEuler( g_lio_state.rot_end );
+                    dump_lio_state_to_log( m_lio_state_fp );
+                    G.block<DIM_OF_STATES, 6>(0, 0) = K * Hsub;
+                    g_lio_state.cov = (I_STATE - G) * g_lio_state.cov;
+                    position_last = g_lio_state.pos_end;
+                    solve_time += omp_get_wtime() - solve_start;
+                    }
 
 
 
@@ -1042,13 +1053,6 @@ int R3LIVE::service_LIO_update()
                 }
             }
 
-            g_lio_state.last_update_time = Measures.lidar_end_time;
-            euler_cur = RotMtoEuler( g_lio_state.rot_end );
-            dump_lio_state_to_log( m_lio_state_fp );
-            G.block<DIM_OF_STATES, 6>(0, 0) = K * Hsub;
-            g_lio_state.cov = (I_STATE - G) * g_lio_state.cov;
-            position_last = g_lio_state.pos_end;
-            solve_time += omp_get_wtime() - solve_start;
                 t3 = omp_get_wtime();
                 /*** add new frame points to map ikdtree ***/
                 PointVector points_history;
