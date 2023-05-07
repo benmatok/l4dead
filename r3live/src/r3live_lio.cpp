@@ -886,16 +886,16 @@ int R3LIVE::service_LIO_update()
                     }
                     //until converge
                     /*** Computation of Measuremnt Jacobian matrix H and measurents vector ***/
-                    Eigen::MatrixXd Hsub(3, 6);
-                    Eigen::VectorXd meas_vec(3);
-                    Hsub.setZero();
-                    
-                    int count = 0 ;
                     
 
 
                     for( int  j = 0 ;j< 20 ; j++)
                     {
+                    Eigen::MatrixXd Hsub(3, 6);
+                    Eigen::VectorXd meas_vec(3);
+                    Hsub.setZero();
+                    
+                    int count = 0 ;
 
                     for (int i : selected_ind)
                     {
