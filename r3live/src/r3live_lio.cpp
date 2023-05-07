@@ -973,7 +973,6 @@ int R3LIVE::service_LIO_update()
     
                 }
 
-                std::cout << "hhhhhhhhhhhhhh" << best_num_agree  << "  " << surface_points_normals.size() << std::endl;
 
 
 
@@ -1252,7 +1251,7 @@ int R3LIVE::service_LIO_update()
         std::cout << "Time difference_lio = " << moving_avg_lio << "[ms]" << std::endl;
         std::cout << "points_size " << Measures.lidar->size() << std::endl;
         iter_counter++;
-        outfile.close();
+        outfile.close(); 
     }
     return 0;
 }
