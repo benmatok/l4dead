@@ -599,11 +599,12 @@ int R3LIVE::service_LIO_update()
 
         ros::spinOnce();
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        while (g_camera_lidar_queue.if_lidar_can_process(g_LiDAR_frame_index) == false)
+       while (g_camera_lidar_queue.if_lidar_can_process(g_LiDAR_frame_index) == false)
         {
             ros::spinOnce();
             std::this_thread::yield();
             std::this_thread::sleep_for(std::chrono::milliseconds(THREAD_SLEEP_TIM));
+
         }
         std::unique_lock<std::mutex> lock(m_mutex_lio_process);
         // printf_line;
