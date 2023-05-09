@@ -82,7 +82,7 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
 
 #include "lib_sophus/so3.hpp"
 #include "lib_sophus/se3.hpp"
-
+#include <chrono>
 #include "tools_logger.hpp"
 #include "tools_color_printf.hpp"
 #include "tools_eigen.hpp"
@@ -168,6 +168,8 @@ public:
     double HALF_FOV_COS = 0.0;
     double FOV_DEG = 0.0;
     double res_mean_last = 0.05;
+    double res_max = -1;
+
     double total_distance = 0.0;
     Eigen::Vector3d position_last = Zero3d;
     double copy_time, readd_time, fov_check_time, readd_box_time, delete_box_time;
@@ -259,7 +261,7 @@ public:
     Global_map m_map_rgb_pts;
     int m_maximum_image_buffer = 2;
     int m_track_windows_size = 50;
-    double m_minumum_rgb_pts_size = 0.05;
+    double m_minumum_rgb_pts_size = 0.15;
     double m_vio_image_width = 0;
     double m_vio_image_heigh = 0;
     int m_if_estimate_i2c_extrinsic = 1;
@@ -448,7 +450,7 @@ public:
 
     //project lidar frame to world
     void pointBodyToWorld(PointType const *const pi, PointType *const po);
-
+    void pointBodyToWorldState(PointType const *const pi, PointType *const po ,StatesGroup  curr_state ) ; 
     template <typename T>
     void pointBodyToWorld(const Eigen::Matrix<T, 3, 1> &pi, Eigen::Matrix<T, 3, 1> &po)
     {
@@ -458,6 +460,7 @@ public:
         po[1] = p_global(1);
         po[2] = p_global(2);
     }
+    
     void RGBpointBodyToWorld(PointType const *const pi, pcl::PointXYZI *const po);
     int get_cube_index(const int &i, const int &j, const int &k);
     bool center_in_FOV(Eigen::Vector3f cube_p);
@@ -469,4 +472,6 @@ public:
     int service_LIO_update();
     void publish_render_pts( ros::Publisher &pts_pub, Global_map &m_map_rgb_pts );
     void print_dash_board();
+
+
 };

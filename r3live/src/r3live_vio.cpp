@@ -341,6 +341,8 @@ void R3LIVE::image_comp_callback( const sensor_msgs::CompressedImageConstPtr &ms
 // ANCHOR - image_callback
 void R3LIVE::image_callback( const sensor_msgs::ImageConstPtr &msg )
 {
+    static std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();     
+
     std::unique_lock< std::mutex > lock( mutex_image_callback );
     if ( sub_image_typed == 2 )
     {
@@ -349,11 +351,17 @@ void R3LIVE::image_callback( const sensor_msgs::ImageConstPtr &msg )
     sub_image_typed = 1;
 
     g_received_img_msg.push_back(msg);
+
+      
+    std::chrono::steady_clock::time_point  end = std::chrono::steady_clock::now();
+    float time_cb = (float)std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()/1000.0 ; 
     if ( g_flag_if_first_rec_img )
     {
         g_flag_if_first_rec_img = 0;
         m_thread_pool_ptr->commit_task( &R3LIVE::service_process_img_buffer, this );
     }
+
+    begin = end;
     return;
 }
 
@@ -362,6 +370,7 @@ int    buffer_max_frame = 0;
 int    total_frame_count = 0;
 void   R3LIVE::process_image( cv::Mat &temp_img, double msg_time )
 {
+    
     cv::Mat img_get;
     if ( temp_img.rows == 0 )
     {
@@ -418,6 +427,7 @@ void   R3LIVE::process_image( cv::Mat &temp_img, double msg_time )
     // img_pose->image_equalize();
     m_camera_data_mutex.lock();
     m_queue_image_with_pose.push_back( img_pose );
+    
     m_camera_data_mutex.unlock();
     total_frame_count++;
 
@@ -548,7 +558,10 @@ void R3LIVE::publish_track_pts( Rgbmap_tracker &tracker )
 bool R3LIVE::vio_preintegration( StatesGroup &state_in, StatesGroup &state_out, double current_frame_time )
 {
     state_out = state_in;
-    if ( current_frame_time <= state_in.last_update_time )
+    //if ( current_frame_time < state_in.last_update_time )
+    //if ( std::abs(current_frame_time - state_in.last_update_time) < 0.01 )
+    //if ( current_frame_time < state_in.last_update_time )
+    if ( std::abs(current_frame_time - state_in.last_update_time) < 1e-5 )
     {
         // cout << ANSI_COLOR_RED_BOLD << "Error current_frame_time <= state_in.last_update_time | " <<
         // current_frame_time - state_in.last_update_time << ANSI_COLOR_RESET << endl;
@@ -1100,8 +1113,10 @@ void R3LIVE::service_VIO_update()
     cv::imshow( "Control panel", generate_control_panel_img().clone() );
     Common_tools::Timer tim;
     cv::Mat             img_get;
+    float moving_avg_vio = 0 ;
     while ( ros::ok() )
     {
+        std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
         cv_keyboard_callback();
         while ( g_camera_lidar_queue.m_if_have_lidar_data == 0 )
         {
@@ -1150,6 +1165,7 @@ void R3LIVE::service_VIO_update()
             m_map_rgb_pts.selection_points_for_projection( img_pose, &rgb_pts_vec, &pts_2d_vec, m_track_windows_size / m_vio_scale_factor );
             op_track.init( img_pose, rgb_pts_vec, pts_2d_vec );
             g_camera_frame_idx++;
+            //std::cout << "22222222222222222222222222" << std::endl ; 
             continue;
         }
 
@@ -1195,7 +1211,7 @@ void R3LIVE::service_VIO_update()
         tim.tic( "Vio_f2m" );
         res_photometric = vio_photometric( state_out, op_track, img_pose );
         g_cost_time_logger.record( tim, "Vio_f2m" );
-        g_lio_state = state_out;
+        //g_lio_state = state_out;
         print_dash_board();
         set_image_pose( img_pose, state_out );
 
@@ -1261,5 +1277,19 @@ void R3LIVE::service_VIO_update()
             g_cost_time_logger.flush();
         }
         // cout << "Publish cost time " << tim.toc("Pub") << endl;
+
+        //std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+        //moving_avg_vio = 0.8*moving_avg_vio + 0.2*(float)std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()/1000.0  ; 
+       // std::cout << "Time difference_vio = " << moving_avg_vio  << "[ms]" << std::endl ; 
+
     }
+
+
+
+
+
+
+
+
+
 }
