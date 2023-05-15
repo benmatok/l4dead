@@ -859,7 +859,8 @@ int R3LIVE::service_LIO_update()
                 std::vector<int> best_agree_points;
                 double best_num_agree = 0;
                 std::chrono::steady_clock::time_point start_ransac = std::chrono::steady_clock::now();
-                for (int ransac_iter = 0; ransac_iter < 100; ransac_iter++)
+                bool is_ransac = true ;
+                for (int ransac_iter = 0; ransac_iter < 1000; ransac_iter++)
                 {
                 if (!flg_EKF_inited)
                 {
@@ -877,19 +878,64 @@ int R3LIVE::service_LIO_update()
                     std::set<int> selected_ind;
                     
 
-
-
+                    std::vector< Eigen::Vector3d > ransac_points ; 
+                    int count = 0 ; 
                     while (selected_ind.size() < 3)
                     {
-                        int ind = 1 + std::rand() / ((RAND_MAX + 1u) / surface_points.size());
+                        if(count > 2*surface_points.size()  ){
+                            is_ransac = false;
+                           break ; 
+                       }
+                        int ind = 1+ std::rand() / ((RAND_MAX + 1u) / surface_points.size());
+                        // int ind =  std::rand() % surface_points.size();
+                         
 
+
+                        const PointType &norm_p = surface_points_normals[ind];
+                        Eigen::Vector3d norm_vec(norm_p.x, norm_p.y, norm_p.z);
+                        bool is_high_degree = true ; 
+                        for(int j = 0 ; j <ransac_points.size() ; j ++ )
+                         {
+                           double dot_product = norm_vec.transpose() *ransac_points[j] ; 
+                           double angle = std::acos(dot_product/(norm_vec.norm() *ransac_points[j].norm()  )); 
+                            angle *= 180/M_PI ; 
+                            if(angle  > 90)
+                            {
+                                angle = 180 - angle ; 
+                            }
+                            if(angle<30)
+                            {
+                                is_high_degree = false ; 
+                                break ; 
+                            }
+                         } 
+
+                        if(is_high_degree)
+                         {
+                        ransac_points.push_back(norm_vec) ; 
 
                         selected_ind.insert(ind);
-                    }
+                         }
+                        count++; 
+                    } 
+
+
+
+                    double dot1 = 180/M_PI*std::acos(ransac_points[1].transpose() * ransac_points[0])  ; 
+
+                    dot1 = (dot1>90)? 180 -dot1 : dot1 ; 
+                    double dot2 = 180/M_PI*std::acos(ransac_points[2].transpose() * ransac_points[1])  ; 
+                    dot2 = (dot2>90)? 180-dot2 : dot2 ; 
+                    double dot3 = 180/M_PI*std::acos(ransac_points[2].transpose() * ransac_points[0] ) ; 
+                    dot3 = (dot3>90)? 180-dot3 : dot3 ; 
+                    std::cout << dot1 << " " << dot2 << " " << dot3 << std::endl;
                     //until converge
                     /*** Computation of Measuremnt Jacobian matrix H and measurents vector ***/
                     
-   
+                    if(!is_ransac)
+                    {
+                        break ; 
+                    }
 
                     for( int  j = 0 ;j< 20 ; j++)
                     {
@@ -987,6 +1033,9 @@ int R3LIVE::service_LIO_update()
                     }
     
                 }
+
+
+
                 std::chrono::steady_clock::time_point end_ransac = std::chrono::steady_clock::now();
 
 
@@ -994,7 +1043,8 @@ int R3LIVE::service_LIO_update()
 
 
 
-
+                if(is_ransac)
+                {
                 for( int j = 0 ; j<20 ; j++)
                 {
 
@@ -1078,6 +1128,9 @@ int R3LIVE::service_LIO_update()
 
                 
             }
+
+                }
+
 
                 t3 = omp_get_wtime();
                 /*** add new frame points to map ikdtree ***/
@@ -1271,4 +1324,3 @@ int R3LIVE::service_LIO_update()
     }
     return 0;
 }
-
