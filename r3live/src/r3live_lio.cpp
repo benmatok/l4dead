@@ -880,18 +880,19 @@ int R3LIVE::service_LIO_update()
 
                     std::vector< Eigen::Vector3d > ransac_points ; 
                     int count = 0 ; 
-                    while (selected_ind.size() < 3)
-                    {
-                        if(count > 2*surface_points.size()  ){
-                            is_ransac = false;
-                           break ; 
-                       }
-                        int ind = 1+ std::rand() / ((RAND_MAX + 1u) / surface_points.size());
+                    int ind = 1+ std::rand() / ((RAND_MAX + 1u) / surface_points.size());
+                     const PointType &norm_first = surface_points_normals[ind];
+                    Eigen::Vector3d norm_vec_first(norm_first.x, norm_first.y, norm_first.z);
+                    selected_ind.insert(ind);
+                    ransac_points.push_back(norm_vec_first) ;
                         // int ind =  std::rand() % surface_points.size();
                          
 
-
-                        const PointType &norm_p = surface_points_normals[ind];
+                    for(int p = 0 ; p<2 ; p++)
+                    {
+                        for(int i =0 ; i<surface_points_normals.size() ; i++ )
+                        {
+                        const PointType &norm_p = surface_points_normals[i];
                         Eigen::Vector3d norm_vec(norm_p.x, norm_p.y, norm_p.z);
                         bool is_high_degree = true ; 
                         for(int j = 0 ; j <ransac_points.size() ; j ++ )
@@ -903,24 +904,23 @@ int R3LIVE::service_LIO_update()
                             {
                                 angle = 180 - angle ; 
                             }
-                            if(angle<30)
+                            if(angle<5)
                             {
                                 is_high_degree = false ; 
                                 break ; 
                             }
-                         } 
-
-                        if(is_high_degree)
-                         {
-                        ransac_points.push_back(norm_vec) ; 
-
-                        selected_ind.insert(ind);
                          }
-                        count++; 
-                    } 
+
+                         if(is_high_degree)
+                         {
+                           selected_ind.insert(ind);
+                           ransac_points.push_back(norm_vec) ;
+
+                         } 
+                        }
 
 
-
+                    }
                     double dot1 = 180/M_PI*std::acos(ransac_points[1].transpose() * ransac_points[0])  ; 
 
                     dot1 = (dot1>90)? 180 -dot1 : dot1 ; 
