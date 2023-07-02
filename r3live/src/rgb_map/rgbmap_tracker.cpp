@@ -254,7 +254,6 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
         {
 
             deform_row(i, j) = i;
-            
             deform_col(i, j) = j;
             double diff =   (old_gray.at<double>(i,j) -  new_gray.at<double>(i,j) ) ; 
             diff_intensity +=  diff*diff ; 
@@ -262,13 +261,13 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
 
 
     }
-    std::cout << deform_col(0 , 480 ) << std::endl;
     std::cout << "before_intensity"  << diff_intensity <<  std::endl ;  
 
     for (int iter = 0; iter < 1; iter++)
     {
-        Eigen::MatrixXd clone_deform_row = deform_row.replicate(deform_row.rows() , deform_row.cols() ) ; 
-        Eigen::MatrixXd clone_deform_col = deform_col.replicate(deform_row.rows() , deform_row.cols() ) ; 
+        Eigen::MatrixXd clone_deform_row = deform_row ; //.replicate(deform_row.rows() , deform_row.cols() ) ; 
+        Eigen::MatrixXd clone_deform_col = deform_col; //.replicate(deform_row. rows() , deform_row.cols() ) ; 
+        std::cout << "hello" <<  std::endl;
         for (int i = 0; i < new_gray.rows; i++)
         {
             for (int j = 0; j < new_gray.cols; j++)
@@ -292,11 +291,11 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
                 //outfile << std::setprecision(10) << old_gray.at<double>(i, j) << std::endl;
                 double v_row = i_minus_jt * grad_y / (grad_norm_2 + i_minus_jt * i_minus_jt+ 1e-6);
                 double v_col = i_minus_jt * grad_x / (grad_norm_2 + i_minus_jt * i_minus_jt + 1e-6);
-                new_i =  i + round(v_row) ; 
+                new_i =  i + ceil(v_row) ; 
     
-                new_j =  j + round(v_col) ; 
-                outfile  << std::setprecision(10) <<  clone_deform_col(i , j)  -  
-                j <<  " "  << clone_deform_col(i , j) << " " << j <<  std::endl;
+                new_j =  j + ceil(v_col) ; 
+                //outfile  << std::setprecision(10) <<  clone_deform_col(i , j)  -  
+                //j <<  " "  << clone_deform_col(i , j) << " " << j <<  std::endl;
 
 
                 if (new_i < 0 || new_i >= new_gray.rows || new_j < 0 || new_j >= new_gray.cols)
@@ -312,7 +311,6 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
         }
         
     }
-    //outfile.close();
     double after_intensity = 0 ; 
     for (int i = 0; i < new_gray.rows; i++)
     {
