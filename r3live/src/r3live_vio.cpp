@@ -786,6 +786,8 @@ bool      R3LIVE::vio_esikf( StatesGroup &state_in, Rgbmap_tracker &op_track )
     return true;
 }
 
+
+
 bool R3LIVE::vio_photometric( StatesGroup &state_in, Rgbmap_tracker &op_track, std::shared_ptr< Image_frame > &image )
 {
     Common_tools::Timer tim;
@@ -1101,6 +1103,10 @@ char R3LIVE::cv_keyboard_callback()
     }
     return c;
 }
+
+
+
+
 
 // ANCHOR -  service_VIO_update
 void R3LIVE::service_VIO_update()
