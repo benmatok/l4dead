@@ -533,30 +533,44 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
     m_old_gray.convertTo(old_gray, CV_64F);
     cv::Mat new_gray ;
     curr_img.convertTo(new_gray, CV_64F);
-    cv::Mat x_kernel =  (cv::Mat_<float>(1, 3) << -0.5f, 0.0f, 0.5f);
+    new_gray = cv::imread("/catkin_ws/src/r3live/test/moving.png");
+    old_gray = cv::imread("/catkin_ws/src/r3live/test/static.png");
+
+
+    cv::Mat x_kernel =  (cv::Mat_<double>(1, 3) << -0.5f, 0.0f, 0.5f);
     cv::Mat grad_x_old ;
+    new_gray = new_gray/255 ; 
+    old_gray = old_gray/255 ; 
+
+
     cv::filter2D(old_gray, grad_x_old, -1, x_kernel); 
      cv::imwrite( "/app/grad.png", old_gray ); 
     cv::Mat grad_y_old  ;
     cv::filter2D(old_gray, grad_y_old, -1, x_kernel.t() );
-    Eigen::MatrixXd deform_row (new_gray.rows, new_gray.cols) ;
-    Eigen::MatrixXd deform_col (new_gray.rows, new_gray.cols) ; 
+    //Eigen::MatrixXd deform_row (new_gray.rows, new_gray.cols) ;
+    //deform_row.setZero() ; 
+    //Eigen::MatrixXd deform_col (new_gray.rows, new_gray.cols) ; 
+    //deform_col.setZero() ;  
+
+
+    cv::Mat deform_row (old_gray.rows, old_gray.cols, CV_64F, cv::Scalar(0));
+    cv::Mat deform_col (old_gray.rows, old_gray.cols, CV_64F, cv::Scalar(0));
 
 
 
 
 
     
-    for (int i = 0; i < new_gray.rows; i++)
-    {
-        for (int j = 0; j < new_gray.cols; j++)
+     for (int i = 0; i < new_gray.rows; i++)
+     {
+         for (int j = 0; j < new_gray.cols; j++)
         {
 
-            deform_row(i, j) = i;
-            deform_col(i, j) = j;
+            // deform_row(i, j) = i;
+            // deform_col(i, j) = j;
 
 
-            outfile << std::setprecision(10) <<  deform_row(i, j)  << std::endl; 
+            //outfile << std::setprecision(10) <<  deform_row(i, j)  << std::endl; 
             double diff =   (old_gray.at<double>(i,j) -  new_gray.at<double>(i,j) ) ; 
             diff_intensity +=  diff*diff ; 
         }
@@ -564,14 +578,18 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
 
     }
 
+    
 
+
+    cv::Mat original_new_gray ; 
+     new_gray.copyTo(original_new_gray);
     std::cout << "before_intensity"  << diff_intensity <<  std::endl ;  
-
-    for (int iter = 0; iter < 1; iter++)
-    {
-        Eigen::MatrixXd clone_deform_row = deform_row ; //.replicate(deform_row.rows() , deform_row.cols() ) ; 
-        Eigen::MatrixXd clone_deform_col = deform_col; //.replicate(deform_row. rows() , deform_row.cols() ) ; 
-        std::cout << "hello" <<  std::endl;
+    for (int iter = 0; iter < 200; iter++)
+    {   
+        //cv::Mat temp_new_gray ; 
+        //new_gray.copyTo(temp_new_gray);
+        //Eigen::MatrixXd clone_deform_row = deform_row ; //.replicate(deform_row.rows() , deform_row.cols() ) ; 
+        //Eigen::MatrixXd clone_deform_col = deform_col; //.replicate(deform_row. rows() , deform_row.cols() ) ; 
         for (int i = 0; i < new_gray.rows; i++)
         {
             for (int j = 0; j < new_gray.cols; j++)
@@ -581,43 +599,77 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
 
                 
 
-                 double  new_gray_value  = get_interpulation_value(new_gray , i ,  j ,   7 , clone_deform_row(i,j) ,clone_deform_col(i,j)   )  ;
-
+                double  new_gray_value  = get_interpulation_value(new_gray , i ,  j ,   7 , i +  deform_row.at<double>(i,j) ,j +  deform_col.at<double>(i,j)   )  ;
                 double grad_x = grad_x_old.at<double>(i, j);
                 double grad_y = grad_y_old.at<double>(i, j);
-                
 
+        
                 double i_minus_jt = old_gray.at<double>(i, j) - new_gray_value;
                 double grad_norm_2 = grad_x * grad_x + grad_y * grad_y;
-                //outfile << std::setprecision(10) <<  old_gray.at<double>(i, j)  << std::endl;
-                double v_row = i_minus_jt * grad_y / (grad_norm_2 + i_minus_jt * i_minus_jt+ 1e-6);
-                double v_col = i_minus_jt * grad_x / (grad_norm_2 + i_minus_jt * i_minus_jt + 1e-6);
-                deform_row(i, j) += v_row  ; 
-                deform_col(i, j) += v_col  ;
+                double v_row = 0 ;
+                double v_col = 0 ;
+                double alpha = 1 ;
+
+                if(grad_norm_2 >0   )
+                {
+                v_row = i_minus_jt * grad_y / (grad_norm_2 + i_minus_jt * i_minus_jt);
+                v_col = i_minus_jt * grad_x/ (grad_norm_2 + i_minus_jt * i_minus_jt);
+                }
+                deform_row.at<double>(i,j) += v_row ; 
+                deform_col.at<double>(i,j) += v_col ; 
+                
+
+
+
+
+                
 
             }
         }
+
+        cv::Size blurSize(7, 7 );  // Kernel size for blurring (adjust as needed)
+        cv::Mat blurred_deform_row ; 
+        cv::Mat blurred_deform_col ; 
+                // Apply the box blur
+        cv::boxFilter(deform_row, blurred_deform_row, -1, blurSize);
+        cv::boxFilter(deform_col, blurred_deform_col, -1, blurSize);
+        blurred_deform_row.copyTo(deform_row);
+        blurred_deform_col.copyTo(deform_col);
+
+
         
     }
     double after_intensity = 0 ; 
-    cv::Mat new_mat(new_gray.rows , new_gray.cols , CV_64F, cv::Scalar(0));
-    for (int i = 0; i < new_gray.rows; i++)
-    {
-        for (int j = 0; j < new_gray.cols; j++)
+     for (int i = 0; i < new_gray.rows; i++)
+     {
+         for (int j = 0; j < new_gray.cols; j++)
         {
-            double  new_gray_value  = get_interpulation_value(new_gray , i ,  j ,   11 , deform_row(i,j) ,deform_col(i,j)   )  ;
-            new_mat.at<double>(i,j) = new_gray_value ; 
-            outfile << std::setprecision(10) << new_gray_value  << std::endl;
-            double diff =   (old_gray.at<double>(i,j) -  new_gray_value ) ; 
-            after_intensity +=   diff*diff  ; 
-            
+
+            // deform_row(i, j) = i;
+            // deform_col(i, j) = j;
+
+            double  new_gray_value  = get_interpulation_value(original_new_gray , i ,  j ,   7 , i +  deform_row.at<double>(i,j) ,j +  deform_col.at<double>(i,j)   )  ;
+            new_gray.at<double>(i,j) = new_gray_value ;
+            outfile << std::setprecision(10) <<  deform_row.at<double>(i, j)  << std::endl; 
+            double diff =   (old_gray.at<double>(i,j) -  new_gray.at<double>(i,j) ) ; 
+            after_intensity +=  diff*diff ; 
         }
+
+
     }
-    cv::imwrite("/app/last_image.png" ,new_mat ) ;
+
+
+
+
+    cv::imwrite("/app/images/" + std::to_string(m_frame_idx) + "before_reg.png" ,255*original_new_gray ) ;
+    cv::imwrite("/app/images/" + std::to_string(m_frame_idx) + "after_reg.png" ,255*new_gray ) ;
+    cv::imwrite("/app/images/" + std::to_string(m_frame_idx) +"to_reg.png" ,255*old_gray ) ;
+    m_frame_idx+=1;
     std::cout << "after_intensity"  << after_intensity <<  std::endl ; 
     std::cout << "gain_intensity"  << after_intensity - diff_intensity <<  std::endl ; 
     outfile.close();
-
+    m_old_gray = curr_img ;
+ 
     
 }
 
