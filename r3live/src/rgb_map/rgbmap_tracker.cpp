@@ -313,43 +313,12 @@ double bilinearInterpolation(const std::vector<Point>& points, double x, double 
 
 double get_interpulation_value(cv::Mat &image , int row , int col ,int kernel_size , double x , double y   ) 
 {
-
-    bool cant_inter = false; 
-    if(x >= image.rows  -2  )
-    { 
-        x = image.rows  -2  ;  
-
-        cant_inter = true ; 
-    }
+    
 
 
 
-    if(x >=image.cols  -2  )
-    { 
-        y = image.cols  -2  ;  
-
-        cant_inter = true ; 
-    }
-    if(x <= 0  )
-    { 
-        x = 0  ;  
-
-        cant_inter = true ; 
-    }
-
-
-
-    if(y <= 0  )
-    { 
-        y = 0  ;  
-
-        cant_inter = true ; 
-    }
-
-    if(cant_inter)
+    if(x >= image.rows  -2 ||  y <= 0 || x <= 0  || y >=image.cols  -2 )
     {
-        int row =x ; 
-        int col =y ; 
         return image.at<double>(row,col) ; 
 
     }
@@ -381,12 +350,19 @@ double get_interpulation_value(cv::Mat &image , int row , int col ,int kernel_si
      double p4_z  =  image.at<double>(p4_x,p4_y) ;
 
 
+
     // Check if the sample points lie on a horizontal line
+    
     if (p1_y == p2_y && p3_y == p4_y)
     {
         double z1 = p1_z + (x - p1_x) / (p2_x - p1_x) * (p2_z - p1_z);
         double z2 = p3_z + (x - p3_x) / (p4_x - p3_x) * (p4_z - p3_z);
-        return z1 + (y - p1_y) / (p3_y - p1_y) * (z2 - z1);
+    
+
+
+        double value = z1 + (y - p1_y) / (p3_y - p1_y) * (z2 - z1);
+
+        return value;
     }
 
 
@@ -395,7 +371,11 @@ double get_interpulation_value(cv::Mat &image , int row , int col ,int kernel_si
     {
         double z1 = p1_z + (y - p1_y) / (p3_y - p1_y) * (p3_z - p1_z);
         double z2 = p2_z + (y - p2_y) / (p4_y - p2_y) * (p4_z - p2_z);
-        return z1 + (x - p1_x) / (p2_x - p1_x) * (z2 - z1);
+        double value =  z1 + (x - p1_x) / (p2_x - p1_x) * (z2 - z1);
+
+
+
+        return value;
     }
 
 
@@ -405,7 +385,8 @@ double get_interpulation_value(cv::Mat &image , int row , int col ,int kernel_si
     double z3 = p3_z * (p4_x - x) * (y - p3_y);
     double z4 = p4_z * (x - p3_x) * (y - p3_y);
 
-    return (z1 + z2 + z3 + z4) / ((p2_x - p1_x) * (p3_y - p1_y));
+   double value =  (z1 + z2 + z3 + z4) / ((p2_x - p1_x) * (p3_y - p1_y));
+    return value ; 
 
 
 
@@ -419,109 +400,6 @@ double get_interpulation_value(cv::Mat &image , int row , int col ,int kernel_si
 
 
 
-double get_interpulation_value_eigen(Eigen::MatrixXd &image , int row , int col ,int kernel_size , double x , double y   ) 
-{
-
-    bool cant_inter = false; 
-    if(x >= image.rows()  -2  )
-    { 
-        x = image.rows()  -2  ;  
-
-        cant_inter = true ; 
-    }
-
-
-
-    if(x >=image.cols()  -2  )
-    { 
-        y = image.cols()  -2  ;  
-
-        cant_inter = true ; 
-    }
-    if(x <= 0  )
-    { 
-        x = 0  ;  
-
-        cant_inter = true ; 
-    }
-
-
-
-    if(y <= 0  )
-    { 
-        y = 0  ;  
-
-        cant_inter = true ; 
-    }
-
-    if(cant_inter)
-    {
-        int row =x ; 
-        int col =y ; 
-        return image(row,col) ; 
-
-    }
-
-
-
-
-    int rows = image.rows() ; 
-    int cols = image.cols() ; 
-
-    int p1_x =  floor(x ) ; 
-    int p1_y =  floor(y ) ; 
-    double p1_z  =  image(p1_x,p1_y) ; 
-
-
-
-    int p2_x =  ceil(x+1 ) ; 
-    int p2_y =   floor(y ) ; 
-    double p2_z  =  image(p2_x,p2_y) ;
-
-
-    int p3_y =  ceil(y+1 ) ; 
-    int p3_x =   floor(x ) ; 
-    double p3_z  =  image(p3_x,p3_y) ;
-
-    int p4_y =  ceil(y+1 ) ; 
-    int p4_x =   ceil(x+1 ) ; 
-
-     double p4_z  =  image(p4_x,p4_y) ;
-
-
-    // Check if the sample points lie on a horizontal line
-    if (p1_y == p2_y && p3_y == p4_y)
-    {
-        double z1 = p1_z + (x - p1_x) / (p2_x - p1_x) * (p2_z - p1_z);
-        double z2 = p3_z + (x - p3_x) / (p4_x - p3_x) * (p4_z - p3_z);
-        return z1 + (y - p1_y) / (p3_y - p1_y) * (z2 - z1);
-    }
-
-
-
-     if (p1_x == p3_x)
-    {
-        double z1 = p1_z + (y - p1_y) / (p3_y - p1_y) * (p3_z - p1_z);
-        double z2 = p2_z + (y - p2_y) / (p4_y - p2_y) * (p4_z - p2_z);
-        return z1 + (x - p1_x) / (p2_x - p1_x) * (z2 - z1);
-    }
-
-
-    // Perform bilinear interpolation
-    double z1 = p1_z * (p2_x - x) * (p2_y - y);
-    double z2 = p2_z * (x - p1_x) * (p2_y - y);
-    double z3 = p3_z * (p4_x - x) * (y - p3_y);
-    double z4 = p4_z * (x - p3_x) * (y - p3_y);
-
-    return (z1 + z2 + z3 + z4) / ((p2_x - p1_x) * (p3_y - p1_y));
-
-
-
-    
-
-
-
-}
 
 void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::Point2f> &last_tracked_pts, std::vector<cv::Point2f> &curr_tracked_pts, std::vector<uchar> &status, int opm_method)
 {
@@ -529,12 +407,19 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
 
     outfile.open("/app/debug.txt") ; 
     double diff_intensity = 0 ;
+
+
+    //curr_img = cv::imread("/catkin_ws/src/r3live/test/moving.png"); 
+    //m_old_gray = cv::imread("/catkin_ws/src/r3live/test/static.png");
+    
+    
     cv::Mat old_gray ;
     m_old_gray.convertTo(old_gray, CV_64F);
     cv::Mat new_gray ;
     curr_img.convertTo(new_gray, CV_64F);
-    new_gray = cv::imread("/catkin_ws/src/r3live/test/moving.png");
-    old_gray = cv::imread("/catkin_ws/src/r3live/test/static.png");
+    std::cout << new_gray.rows << std::endl;
+    std::cout << new_gray.cols << std::endl;
+
 
 
     cv::Mat x_kernel =  (cv::Mat_<double>(1, 3) << -0.5f, 0.0f, 0.5f);
@@ -599,7 +484,7 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
 
                 
 
-                double  new_gray_value  = get_interpulation_value(new_gray , i ,  j ,   7 , i +  deform_row.at<double>(i,j) ,j +  deform_col.at<double>(i,j)   )  ;
+                double  new_gray_value  = get_interpulation_value(original_new_gray , i ,  j ,   7 , i +  deform_row.at<double>(i,j) ,j +  deform_col.at<double>(i,j)   )  ;
                 double grad_x = grad_x_old.at<double>(i, j);
                 double grad_y = grad_y_old.at<double>(i, j);
 
@@ -650,7 +535,12 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
 
             double  new_gray_value  = get_interpulation_value(original_new_gray , i ,  j ,   7 , i +  deform_row.at<double>(i,j) ,j +  deform_col.at<double>(i,j)   )  ;
             new_gray.at<double>(i,j) = new_gray_value ;
-            outfile << std::setprecision(10) <<  deform_row.at<double>(i, j)  << std::endl; 
+            double temp = original_new_gray.at<double>(i,j) -new_gray.at<double>(i,j) ; 
+            if(temp < 0.01 )
+            {
+            outfile << std::setprecision(10) <<   deform_row.at<double>(i,j) << " " <<deform_col.at<double>(i,j)   << std::endl;
+            get_interpulation_value(original_new_gray , i ,  j ,   0 , i +  deform_row.at<double>(i,j) ,j +  deform_col.at<double>(i,j)   )  ;
+            } 
             double diff =   (old_gray.at<double>(i,j) -  new_gray.at<double>(i,j) ) ; 
             after_intensity +=  diff*diff ; 
         }
