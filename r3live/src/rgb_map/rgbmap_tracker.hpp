@@ -91,6 +91,7 @@ class Rgbmap_tracker
     eigen_q                                   q_last_estimated_q = eigen_q::Identity();
     vec_3                                     t_last_estimated = vec_3( 0, 0, 0 );
     std::shared_ptr< LK_optical_flow_kernel > m_lk_optical_flow_kernel;
+    
     Rgbmap_tracker();
     ~Rgbmap_tracker(){};
 
@@ -171,5 +172,10 @@ class Rgbmap_tracker
     void track_img( std::shared_ptr< Image_frame > &img_pose, double dis = 2.0, int if_use_opencv = 1 );
     int get_all_tracked_pts( std::vector< std::vector< cv::Point2f > > *img_pt_vec = nullptr );
     int remove_outlier_using_ransac_pnp( std::shared_ptr< Image_frame > &img_pose, int if_remove_ourlier = 1 );
-    void demon_track_image( cv::Mat &curr_img, const std::vector<cv::Point2f> &last_tracked_pts,std::vector<cv::Point2f> &curr_tracked_pts, std::vector<uchar> &status, int opm_method)  ; 
+    void demon_track_image( cv::Mat &curr_img, const std::vector<cv::Point2f> &last_tracked_pts,std::vector<cv::Point2f> &curr_tracked_pts, std::vector<uchar> &status, int opm_method)  ;
+
+
+
+
+    void register_images(cv::Mat &new_gray , cv::Mat &old_gray  , cv::Mat &deform_row , cv::Mat &deform_col  , int num_iter , int kernel_size)  ; 
 };
