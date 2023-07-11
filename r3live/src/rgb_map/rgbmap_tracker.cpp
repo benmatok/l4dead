@@ -307,12 +307,10 @@ void Rgbmap_tracker::register_images(cv::Mat &new_gray , cv::Mat &old_gray  , cv
 {
 
     cv::Mat x_kernel =  (cv::Mat_<float>(1, 3) << -0.5f, 0.0f, 0.5f);
-    cv::Mat  grad_x_old ; 
+    cv::Mat  grad_x_old ;  
     cv::filter2D(old_gray, grad_x_old, -1, x_kernel); 
-    cv::imwrite( "/app/grad.png", old_gray ); 
     cv::Mat grad_y_old  ;
     cv::filter2D(old_gray, grad_y_old, -1, x_kernel.t() );
-
 
 
     for (int iter = 0; iter < num_iter; iter++)
@@ -364,18 +362,45 @@ void Rgbmap_tracker::register_images(cv::Mat &new_gray , cv::Mat &old_gray  , cv
 
 
 
+
+
+void Rgbmap_tracker::demon_scale(cv::Mat &new_gray , cv::Mat &old_gray , cv::Mat &deform_row , cv::Mat &deform_col ,  int scale  , int iter , int kernel_size )  
+{
+
+    cv::Size new_size = cv::Size(new_gray.cols / scale, new_gray.rows / scale ) ; 
+    cv::Size old_size = cv::Size(new_gray.cols , new_gray.rows  ) ; 
+    cv::Mat new_gray_scale ;
+    cv::Mat old_gray_scale ;
+
+
+    cv::resize(new_gray, new_gray_scale,new_size  , cv::INTER_LINEAR );
+    cv::resize(old_gray, old_gray_scale,new_size  , cv::INTER_LINEAR );
+
+
+
+     cv::Mat deform_row_scale ; // = cv::Mat::zeros(old_gray_scale.rows, old_gray_scale.cols, CV_32F)  ;
+    cv::Mat deform_col_scale ;//=  cv::Mat::zeros(old_gray_scale.rows, old_gray_scale.cols, CV_32F)  ;  ;
+     cv::resize(deform_row, deform_row_scale,new_size  , cv::INTER_LINEAR );
+     cv::resize(deform_col, deform_col_scale,new_size  , cv::INTER_LINEAR );
+
+     register_images(new_gray_scale , old_gray_scale  , deform_row_scale , deform_col_scale , iter , kernel_size ) ;
+
+    cv::resize(deform_row_scale, deform_row, old_size,  cv::INTER_LINEAR) ;
+    cv::resize(deform_col_scale, deform_col, old_size ,  cv::INTER_LINEAR );
+    deform_row = deform_row*scale ; 
+    deform_col = deform_col*scale ; 
+
+
+
+
+
+
+}
+
 void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::Point2f> &last_tracked_pts, std::vector<cv::Point2f> &curr_tracked_pts, std::vector<uchar> &status, int opm_method)
 {
 
     auto startTime = std::chrono::high_resolution_clock::now();
-    // std::ofstream outfile;
-
-    // outfile.open("/app/debug.txt") ; 
-    // double diff_intensity = 0 ;
-
-
-
-    
 
 
 
@@ -386,49 +411,8 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
 
 
 
-
-
-    cv::Mat old_image_50_per ;
-    cv::Mat new_image_50_per ; 
-    int how_much_to_scale = 3 ;
-     cv::Size new_size = cv::Size(m_old_gray.cols / how_much_to_scale, m_old_gray.rows / how_much_to_scale ) ; 
-    cv::resize(m_old_gray, old_image_50_per, new_size  , cv::INTER_LINEAR);
-    std::cout << old_image_50_per.rows << std::endl;
-
-    cv::resize(curr_img, new_image_50_per,new_size  , cv::INTER_LINEAR );
-    cv::Mat old_gray_50_per ;
-    old_image_50_per.convertTo(old_gray_50_per, CV_32F);
-    cv::Mat new_gray_50_per ;
-    new_image_50_per.convertTo(new_gray_50_per, CV_32F);
-
-
-
-
-
-
-    new_gray_50_per = new_gray_50_per/255 ; 
-    old_gray_50_per = old_gray_50_per/255 ; 
  
-    cv::Mat deform_row_50_per  (old_image_50_per.rows, old_image_50_per.cols, CV_32F, cv::Scalar(0)) ; 
-    cv::Mat deform_col_50_per   (old_image_50_per.rows, old_image_50_per.cols, CV_32F, cv::Scalar(0))  ; 
 
-
-    register_images(new_gray_50_per , old_gray_50_per  , deform_row_50_per , deform_col_50_per , 50 , 5 ) ;
-
-
-
-
-
-
-    //cv::Mat deform_row = cv::Mat::zeros(m_old_gray.rows  , m_old_gray.cols , CV_32F); 
-    //cv::Mat deform_col  =cv::Mat::zeros(m_old_gray.rows  , m_old_gray.cols , CV_32F)  ; 
-    cv::Mat deform_row ;
-    cv::Mat deform_col ; 
-    new_size = cv::Size( curr_img.cols , curr_img.rows  ) ; 
-    cv::resize(deform_row_50_per, deform_row, new_size,  cv::INTER_LINEAR) ;
-    cv::resize(deform_col_50_per, deform_col, new_size ,  cv::INTER_LINEAR );
-    deform_row = deform_row*how_much_to_scale ; 
-    deform_col = deform_col*how_much_to_scale ; 
 
 
 
@@ -437,8 +421,7 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
     cv::Mat old_gray ;
     m_old_gray.convertTo(old_gray, CV_32F);
     curr_img.convertTo(new_gray, CV_32F);
-    //new_size = cv::Size(new_gray.rows  , new_gray.cols) ; 
-    std::cout << new_size << std::endl ; 
+
     old_gray = old_gray/255 ;
     new_gray = new_gray/255 ; 
     
@@ -446,31 +429,15 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
     cv::Mat original_new_gray ; 
     new_gray.copyTo(original_new_gray);
 
+    std::vector<int> scales = {3 , 1};
+    std::vector<int> iter = {50,5};
     
-    register_images(new_gray , old_gray  , deform_row , deform_col ,  0  , 7) ;
-
-
-
-    cv::Mat new_50 (deform_row_50_per.rows, deform_row_50_per.cols, CV_32F);
-    cv::Mat after_solution(new_gray.rows, new_gray.cols, CV_32F) ;  //(new_gray.rows, new_gray.cols, CV_32F, cv::Scalar(0));
-    for (int i = 0; i < after_solution.rows; i++)
-     {
-         for (int j = 0; j < after_solution.cols; j++)
-        {
-
-
-            float  new_gray_value  =  get_interpulation_value(new_gray , i ,  j ,   7 , i +  deform_row.at<float>(i,j) ,j +  deform_col.at<float>(i,j)   )  ;
-            //float  new_gray_value  =  get_interpulation_value(new_gray_50_per , i ,  j ,   7 , i +  deform_row_50_per.at<float>(i,j) ,j +  deform_col_50_per.at<float>(i,j)   )  ;
-            after_solution.at<float>(i,j) = new_gray_value ;
-        }
-
-
+    cv::Mat deform_row = cv::Mat::zeros(new_gray.rows, new_gray.cols, CV_32F) ; 
+    cv::Mat deform_col  = cv::Mat::zeros(new_gray.rows, new_gray.cols, CV_32F) ; 
+    for(int i = 0 ; i<scales.size() ; i ++)
+    {
+        demon_scale(new_gray , old_gray , deform_row , deform_col ,  scales[i]  , iter[i] , 5 ) ;
     }
-
-
-    cv::imwrite("/app/images/" + std::to_string(m_frame_idx) + "before_reg.png" ,255*new_gray ) ;
-    cv::imwrite("/app/images/" + std::to_string(m_frame_idx) + "after_reg.png" ,255*after_solution ) ;
-    cv::imwrite("/app/images/" + std::to_string(m_frame_idx) +"to_reg.png" ,255*old_gray ) ;
 
     m_frame_idx+=1 ; 
      m_old_gray = curr_img ;
@@ -479,6 +446,31 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
       auto endTime = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
     std::cout << "Execution time: " << duration << " milliseconds" << std::endl;
+
+
+
+
+    cv::Mat after_solution(new_gray.rows, new_gray.cols, CV_32F) ;  //(new_gray.rows, new_gray.cols, CV_32F, cv::Scalar(0));
+    for (int i = 0; i < after_solution.rows; i++)
+     {
+         for (int j = 0; j < after_solution.cols; j++)
+        {
+
+
+            float  new_gray_value  =  get_interpulation_value(new_gray , i ,  j ,   7 , i +  deform_row.at<float>(i,j) ,j +  deform_col.at<float>(i,j)   )  ;
+        
+            after_solution.at<float>(i,j) = new_gray_value ;
+        }
+
+
+    }
+
+
+
+    cv::imwrite("/app/images/" + std::to_string(m_frame_idx) + "before_reg.png" ,255*new_gray ) ;
+    cv::imwrite("/app/images/" + std::to_string(m_frame_idx) + "after_reg.png" ,255*after_solution ) ;
+    cv::imwrite("/app/images/" + std::to_string(m_frame_idx) +"to_reg.png" ,255*old_gray ) ;
+
 
 
 
