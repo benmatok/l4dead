@@ -179,5 +179,5 @@ class Rgbmap_tracker
 
     void register_images(cv::Mat &new_gray , cv::Mat &old_gray  , cv::Mat &deform_row , cv::Mat &deform_col  , int num_iter , int kernel_size)  ; 
 
-    void demon_scale(cv::Mat &new_gray , cv::Mat &old_gray , cv::Mat &deform_row , cv::Mat &deform_col ,  int scale  , int iter , int kernel_size ) ;
+    void demon_scale(cv::Mat &new_gray , cv::Mat &old_gray , cv::Mat &deform_row , cv::Mat &deform_col ,  int scale  , int iter , int kernel_size   , cv::Mat &deform_row_before , cv::Mat &deform_col_before) ;
 };
