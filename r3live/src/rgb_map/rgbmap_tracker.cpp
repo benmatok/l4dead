@@ -398,7 +398,7 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
 
 
 
-    //PROFC_NODE("demons");
+    PROFC_NODE("demons");
 
 
 
@@ -423,9 +423,9 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
     cv::Mat original_new_gray ; 
     new_gray.copyTo(original_new_gray);
 
-    std::vector<int> scales = {10 , 5 , 3 ,1 };
-    std::vector<int> iter = {40,30, 20,0}  ;
-    std::vector<int> kernel_size = {3,3 , 5,7};
+    std::vector<int> scales = {10 ,9 , 7 , 5 , 3 ,1 };
+    std::vector<int> iter = {5,5 , 5,5 , 5 , 0 }  ;
+    std::vector<int> kernel_size = {5,5 , 5,5 , 5 , 0 } ;
     
     cv::Mat deform_row  ; // = cv::Mat::zeros(new_gray.rows, new_gray.cols, CV_32F) ; 
     cv::Mat deform_col  ; //= cv::Mat::zeros(new_gray.rows, new_gray.cols, CV_32F) ; 
@@ -488,9 +488,9 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
 
 
 
-    //cv::imwrite("/app/images/" + std::to_string(m_frame_idx) + "before_reg.png" ,255*new_gray ) ;
-    //cv::imwrite("/app/images/" + std::to_string(m_frame_idx) + "after_reg.png" ,255*after_solution ) ;
-    //cv::imwrite("/app/images/" + std::to_string(m_frame_idx) +"to_reg.png" ,255*old_gray ) ;
+    // cv::imwrite("/app/images/" + std::to_string(m_frame_idx) + "before_reg.png" ,255*new_gray ) ;
+    // cv::imwrite("/app/images/" + std::to_string(m_frame_idx) + "after_reg.png" ,255*after_solution ) ;
+    // cv::imwrite("/app/images/" + std::to_string(m_frame_idx) +"to_reg.png" ,255*old_gray ) ;
 
 
 
