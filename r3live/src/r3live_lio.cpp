@@ -633,6 +633,7 @@ int R3LIVE::service_LIO_update()
             flg_reset = false;
             continue;
         }
+
         g_LiDAR_frame_index++;
 
         tim.tic("Preprocess");
@@ -1036,11 +1037,7 @@ int R3LIVE::service_LIO_update()
                         /*** only run in initialization period ***/
                         set_initial_state_cov(g_lio_state);
                     }
-                    // after converge
-                    std::vector<int> agree_points;
-                    double num_agree = 0;
-                    // check how many points agree
-                    for (int i = 0; i < surface_points.size(); i++)
+                    else
                     {
                         auto &&Hsub_T = Hsub.transpose();
                         H_T_H.block<6, 6>(0, 0) = Hsub_T * Hsub;
@@ -1075,13 +1072,13 @@ int R3LIVE::service_LIO_update()
             }
 
 
-        if(iter_counter < 10)
-        {
-            g_lio_state.rot_end = first_state.rot_end ;
-            g_lio_state.pos_end = first_state.pos_end ;
-            g_lio_state.vel_end = first_state.vel_end ;
-            iter_counter++;
-        }
+        // if(iter_counter < 10)
+        // {
+        //     g_lio_state.rot_end = first_state.rot_end ;
+        //     g_lio_state.pos_end = first_state.pos_end ;
+        //     g_lio_state.vel_end = first_state.vel_end ;
+        //     iter_counter++;
+        // }
 
          
         {
