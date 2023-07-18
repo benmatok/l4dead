@@ -217,7 +217,7 @@ void Global_map::service_refresh_pts_for_projection()
             pts_in_recent_hitted_boxes.reserve(1e6);
             std::unordered_set< std::shared_ptr< RGB_Voxel> > boxes_recent_hitted;
             m_mutex_m_box_recent_hitted->lock();
-            boxes_recent_hitted = m_voxels_recent_visited;
+            boxes_recent_hitted =  m_voxels_recent_visited;
             m_mutex_m_box_recent_hitted->unlock();
 
             // get_all_pts_in_boxes(boxes_recent_hitted, pts_in_recent_hitted_boxes);
@@ -225,7 +225,7 @@ void Global_map::service_refresh_pts_for_projection()
             // m_rgb_pts_in_recent_visited_voxels = pts_in_recent_hitted_boxes;
             m_mutex_rgb_pts_in_recent_hitted_boxes->unlock();
         }
-        selection_points_for_projection(img_for_projection, pts_rgb_vec_for_projection.get(), nullptr, 10.0, 1);
+        selection_points_for_projection(img_for_projection, pts_rgb_vec_for_projection.get(), nullptr, 0.01, 1);
         m_mutex_pts_vec->lock();
         m_pts_rgb_vec_for_projection = pts_rgb_vec_for_projection;
         m_updated_frame_index = img_for_projection->m_frame_idx;
@@ -490,7 +490,7 @@ void Global_map::render_with_a_image(std::shared_ptr<Image_frame> &img_ptr, int 
     // pts_for_render = m_rgb_pts_vec;
     if (if_select)
     {
-        selection_points_for_projection(img_ptr, &pts_for_render, nullptr, 1.0);
+        selection_points_for_projection(img_ptr, &pts_for_render, nullptr, 0.01);
     }
     else
     {
@@ -499,11 +499,74 @@ void Global_map::render_with_a_image(std::shared_ptr<Image_frame> &img_ptr, int 
     render_pts_in_voxels(img_ptr, pts_for_render);
 }
 
+
+
+Eigen::Vector3i jetColorMap(double value)
+{
+    int red = 0;
+    int green = 0;
+    int blue = 0;
+
+    if (value < 0.0)
+        value = 0.0;
+    else if (value > 1.0)
+        value = 1.0;
+
+    if (value <= 0.125)
+    {
+        red = 0;
+        green = 0;
+        blue = static_cast<int>(0.5 + 0.5 * (value * 8.0) * 255.0);
+    }
+    else if (value <= 0.375)
+    {
+        red = 0;
+        green = static_cast<int>((value - 0.125) * 4.0 * 255.0);
+        blue = 255;
+    }
+    else if (value <= 0.625)
+    {
+        red = static_cast<int>((value - 0.375) * 4.0 * 255.0);
+        green = 255;
+        blue = static_cast<int>(255.0 - (value - 0.375) * 4.0 * 255.0);
+    }
+    else if (value <= 0.875)
+    {
+        red = 255;
+        green = static_cast<int>(255.0 - (value - 0.625) * 4.0 * 255.0);
+        blue = 0;
+    }
+    else
+    {
+        red = static_cast<int>(255.0 - (value - 0.875) * 4.0 * 255.0);
+        green = 0;
+        blue = 0;
+    }
+
+    return Eigen::Vector3i(red, green, blue);
+}
+
+
+
 void Global_map::selection_points_for_projection(std::shared_ptr<Image_frame> &image_pose, std::vector<std::shared_ptr<RGB_pts>> *pc_out_vec,
                                                             std::vector<cv::Point2f> *pc_2d_out_vec, double minimum_dis,
                                                             int skip_step,
                                                             int use_all_pts)
 {
+
+
+
+
+    
+    cv::Mat frame_gray = image_pose->m_img_gray;
+
+    cv::Mat grayscale ; 
+     frame_gray.convertTo(grayscale, CV_8UC1);
+   cv::Mat gray_rgb(frame_gray.size(), CV_8UC3) ; 
+       cv::cvtColor(grayscale, gray_rgb, cv::COLOR_GRAY2RGB);
+
+
+
     Common_tools::Timer tim;
     tim.tic();
     if (pc_out_vec != nullptr)
@@ -552,10 +615,28 @@ void Global_map::selection_points_for_projection(std::shared_ptr<Image_frame> &i
         pts_for_projection = m_rgb_pts_vec;
     }
     int pts_size = pts_for_projection.size();
+
+
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
     for (int pt_idx = 0; pt_idx < pts_size; pt_idx += skip_step)
     {
+
         vec_3 pt = pts_for_projection[pt_idx]->get_pos();
         double depth = (pt - image_pose->m_pose_w2c_t).norm();
+        Eigen::Vector3i jet  = jetColorMap(depth/3.0) ; 
+            pcl::PointXYZRGB point;
+            point.x =pt[0];
+            point.y = pt[1];
+            point.z = pt[2];
+            //pcl::detail::uint32_to_rgb color;
+           //color.rgb = ((uint32_t)red << 16 | (uint32_t)green << 8 | (uint32_t)blue); 
+            point.r = jet[0];
+            point.b = jet[1];
+            point.g = jet[2];
+
+            cloud->push_back(point);
+
+
         if (depth > m_maximum_depth_for_projection)
         {
             continue;
@@ -569,8 +650,17 @@ void Global_map::selection_points_for_projection(std::shared_ptr<Image_frame> &i
         {
             continue;
         }
+
         u = std::round(u_f / minimum_dis) * minimum_dis; // Why can not work
         v = std::round(v_f / minimum_dis) * minimum_dis;
+
+        if(u<gray_rgb.cols && v <gray_rgb.rows && u> 0 && v>0 )
+        {
+        gray_rgb.at<cv::Vec3b>(v,u)[0] = jet[2];  // Blue channel
+        gray_rgb.at<cv::Vec3b>(v,u)[1] = jet[1];  // Green channel
+        gray_rgb.at<cv::Vec3b>(v,u)[2] = jet[0];  // Red channel
+        }
+
         if ((!mask_depth.if_exist(u, v)) || mask_depth.m_map_2d_hash_map[u][v] > depth)
         {
             acc++;
@@ -604,14 +694,24 @@ void Global_map::selection_points_for_projection(std::shared_ptr<Image_frame> &i
         {
             pc_2d_out_vec->push_back(map_idx_draw_center_raw_pose[it->first]);
         }
+
+
+
     }
+    //std::cout << "hello" << std::endl;
+    //save_to_pcd("/app/clouds", std::to_string(counter) , 0 ) ;
+     //pcl::io::savePCDFileASCII("/app/clouds/" + std::to_string(counter) + ".pcd", *cloud);
+     //cv::imwrite("/app/images/" + std::to_string(counter) + ".png" , gray_rgb) ;
+
+    counter+=1 ; 
+    
 
 }
 
 void Global_map::save_to_pcd(std::string dir_name, std::string _file_name, int save_pts_with_views )
 {
     Common_tools::Timer tim;
-    Common_tools::create_dir(dir_name);
+    //Common_tools::create_dir(dir_name);
     std::string file_name = std::string(dir_name).append(_file_name);
     scope_color(ANSI_COLOR_BLUE_BOLD);
     cout << "Save Rgb points to " << file_name << endl;
@@ -642,6 +742,7 @@ void Global_map::save_to_pcd(std::string dir_name, std::string _file_name, int s
         pc_rgb.points[ pt_count ].b = m_rgb_pts_vec[ i ]->m_rgb[ 0 ];
         pt_count++;
     }
+    std::cout << pt_count << std::endl;
     cout << ANSI_DELETE_CURRENT_LINE  << "Saving offline map 100% ..." << endl;
     pc_rgb.resize(pt_count);
     cout << "Total have " << pt_count << " points." << endl;

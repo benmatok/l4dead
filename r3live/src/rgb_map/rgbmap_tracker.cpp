@@ -393,12 +393,77 @@ void Rgbmap_tracker::demon_scale(cv::Mat &new_gray , cv::Mat &old_gray , cv::Mat
 
 }
 
-void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::Point2f> &last_tracked_pts, std::vector<cv::Point2f> &curr_tracked_pts, std::vector<uchar> &status, int opm_method)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Eigen::Vector3i jetColorMap2(double value)
+{
+    int red = 0;
+    int green = 0;
+    int blue = 0;
+
+    if (value < 0.0)
+        value = 0.0;
+    else if (value > 1.0)
+        value = 1.0;
+
+    if (value <= 0.125)
+    {
+        red = 0;
+        green = 0;
+        blue = static_cast<int>(0.5 + 0.5 * (value * 8.0) * 255.0);
+    }
+    else if (value <= 0.375)
+    {
+        red = 0;
+        green = static_cast<int>((value - 0.125) * 4.0 * 255.0);
+        blue = 255;
+    }
+    else if (value <= 0.625)
+    {
+        red = static_cast<int>((value - 0.375) * 4.0 * 255.0);
+        green = 255;
+        blue = static_cast<int>(255.0 - (value - 0.375) * 4.0 * 255.0);
+    }
+    else if (value <= 0.875)
+    {
+        red = 255;
+        green = static_cast<int>(255.0 - (value - 0.625) * 4.0 * 255.0);
+        blue = 0;
+    }
+    else
+    {
+        red = static_cast<int>(255.0 - (value - 0.875) * 4.0 * 255.0);
+        green = 0;
+        blue = 0;
+    }
+
+    return Eigen::Vector3i(red, green, blue);
+}
+
+
+
+
+
+
+
+
+void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::Point2f> &last_tracked_pts, std::vector<cv::Point2f> &curr_tracked_pts, std::vector<uchar> &status ,std::shared_ptr<Image_frame> &img_pose )
 {
 
 
-
-    PROFC_NODE("demons");
 
 
 
@@ -440,12 +505,12 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
         
            deform_row_before = cv::Mat::zeros( new_gray.rows / scales[i] , new_gray.cols /scales[i], CV_32F) ; 
            deform_col_before  = cv::Mat::zeros( new_gray.rows / scales[i] ,new_gray.cols /scales[i], CV_32F) ; 
-            demon_scale(new_gray , old_gray , curr_deform_row , curr_deform_col ,  scales[i]  , iter[i] , kernel_size[i]  , deform_row_before  , deform_col_before ) ;
+            demon_scale(old_gray , new_gray , curr_deform_row , curr_deform_col ,  scales[i]  , iter[i] , kernel_size[i]  , deform_row_before  , deform_col_before ) ;
         }
         else 
         {
 
-            demon_scale(new_gray , old_gray , curr_deform_row , curr_deform_col ,  scales[i]  , iter[i] , kernel_size[i]  , deform_row_before  , deform_col_before ) ;
+            demon_scale(old_gray , new_gray , curr_deform_row , curr_deform_col ,  scales[i]  , iter[i] , kernel_size[i]  , deform_row_before  , deform_col_before ) ;
         }
         curr_deform_row.copyTo(deform_row_before) ;
         curr_deform_col.copyTo(deform_col_before) ;
@@ -463,6 +528,86 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
     m_frame_idx+=1 ; 
      m_old_gray = curr_img ;
 
+    
+     curr_tracked_pts.clear()  ;
+     cv::Mat grayscale ; 
+        new_gray.convertTo(grayscale, CV_8UC1, 255.0);
+       cv::Mat new_gray_rgb(new_gray.size(), CV_8UC3) ; 
+       cv::cvtColor(grayscale, new_gray_rgb, cv::COLOR_GRAY2RGB);
+
+
+
+
+
+       cv::Mat grayscale1 ; 
+        old_gray.convertTo(grayscale1, CV_8UC1, 255.0);
+       cv::Mat old_gray_rgb(new_gray.size(), CV_8UC3) ; 
+       cv::cvtColor(grayscale1, old_gray_rgb, cv::COLOR_GRAY2RGB);
+
+
+      //cv::Mat old_gray_rgb(old_gray.size(), CV_8UC3) ; 
+      //cv::cvtColor(old_gray*255, new_gray_rgb, cv::COLOR_GRAY2RGB);
+    //std::cout <<last_tracked_pts.size() -m_rgb_pts_ptr_vec_in_last_frame.size() << std::endl;
+     for(int i = 0 ; i<last_tracked_pts.size() ; i++ )
+     {
+        
+
+          RGB_pts *rgb_pts_ptr = ( ( RGB_pts * ) m_rgb_pts_ptr_vec_in_last_frame[ m_old_ids[ i ] ] );
+          double depth = (rgb_pts_ptr->get_pos() -  img_pose->m_pose_w2c_t ).norm() ; 
+         Eigen::Vector3i jet  = jetColorMap2(depth/3.0) ; 
+
+         cv::Vec3b pixel(jet[2], jet[1], jet[0]);
+
+
+
+
+         
+        int row = round(last_tracked_pts[i].y) ; 
+        int col = round(last_tracked_pts[i].x) ; 
+        old_gray_rgb.at<cv::Vec3b>(row, col) = pixel ;
+        
+
+        if(row > new_gray.rows -2 || row  < 2 || col > new_gray.cols -2 || col < 2   ) 
+        {
+            curr_tracked_pts.push_back(last_tracked_pts[i]) ; 
+            continue ; 
+        }
+
+
+
+        float  curr_deform_row  =  last_tracked_pts[i].y + get_interpulation_value(deform_row , row ,  col ,   7 ,  last_tracked_pts[i].y  ,last_tracked_pts[i].x   )  ;
+        float  curr_deform_col  = last_tracked_pts[i].x+ get_interpulation_value(deform_col , row ,  col ,   7 ,  last_tracked_pts[i].y  ,last_tracked_pts[i].x   ) ;
+        int curr_row_round = round(curr_deform_row) ; 
+        int curr_col_round = round(curr_deform_col) ;
+
+
+
+
+         if(curr_row_round <   new_gray.rows -2 &&  curr_row_round  > 2 && curr_col_round  < new_gray.cols -2  && curr_col_round > 2   ) 
+        {
+            new_gray_rgb.at<cv::Vec3b>(curr_row_round, curr_col_round) = pixel ; 
+        }
+
+
+
+
+        //std::cout << curr_deform_row << std::endl;
+
+        cv::Point2f point; 
+
+        point.y = curr_deform_row ;
+       point.x = curr_deform_col ; 
+       curr_tracked_pts.push_back(point) ; 
+
+
+     }
+
+     //cv::imwrite("/app/images_reg/" + std::to_string(m_frame_idx) + "_1" ,old_gray_rgb ) ;
+      //cv::imwrite("/app/images_reg/new" + std::to_string(m_frame_idx) + ".png" ,new_gray_rgb) ;
+      cv::imwrite("/app/images_reg/old" + std::to_string(m_frame_idx) + ".png" ,old_gray_rgb) ;
+
+
+
      //outfile.close() ; 
       //auto endTime = std::chrono::high_resolution_clock::now();
     //auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
@@ -478,7 +623,7 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
     //     {
 
 
-    //         float  new_gray_value  =  get_interpulation_value(new_gray , i ,  j ,   7 , i +  deform_row.at<float>(i,j) ,j +  deform_col.at<float>(i,j)   )  ;
+    //         float  new_gray_value  =  get_interpulation_value(old_gray , i ,  j ,   7 , i +  deform_row.at<float>(i,j) ,j +  deform_col.at<float>(i,j)   )  ;
         
     //         after_solution.at<float>(i,j) = new_gray_value ;
     //     }
@@ -488,9 +633,9 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
 
 
 
-    // cv::imwrite("/app/images/" + std::to_string(m_frame_idx) + "before_reg.png" ,255*new_gray ) ;
+    // cv::imwrite("/app/images/" + std::to_string(m_frame_idx) + "before_reg.png" ,255*old_gray ) ;
     // cv::imwrite("/app/images/" + std::to_string(m_frame_idx) + "after_reg.png" ,255*after_solution ) ;
-    // cv::imwrite("/app/images/" + std::to_string(m_frame_idx) +"to_reg.png" ,255*old_gray ) ;
+    // cv::imwrite("/app/images/" + std::to_string(m_frame_idx) +"to_reg.png" ,255*new_gray ) ;
 
 
 
@@ -524,7 +669,7 @@ void Rgbmap_tracker::track_img(std::shared_ptr<Image_frame> &img_pose, double di
 
     // m_lk_optical_flow_kernel->track_image( frame_gray, m_last_tracked_pts, m_current_tracked_pts, status, 2 );
     // track_image(m_old_gray , frame_gray, m_last_tracked_pts, m_current_tracked_pts, status, 2 );
-    demon_track_image(frame_gray, m_last_tracked_pts, m_current_tracked_pts, status, 2);
+    demon_track_image(frame_gray, m_last_tracked_pts, m_current_tracked_pts, status, img_pose);
 
     // reduce_vector( m_last_tracked_pts, status );
     // reduce_vector( m_old_ids, status );

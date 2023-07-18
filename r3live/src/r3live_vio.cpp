@@ -482,6 +482,14 @@ void R3LIVE::set_image_pose( std::shared_ptr< Image_frame > &image_pose, const S
     mat_3_3 rot_mat = state.rot_end;
     vec_3   t_vec = state.pos_end;
     vec_3   pose_t = rot_mat * state.pos_ext_i2c + t_vec;
+
+    //std::cout << state.pos_ext_i2c << std::endl;
+    //std::cout << state.rot_ext_i2c << std::endl;
+    
+
+
+
+
     mat_3_3 R_w2c = rot_mat * state.rot_ext_i2c;
 
     image_pose->set_pose( eigen_q( R_w2c ), pose_t );
@@ -690,6 +698,8 @@ bool      R3LIVE::vio_esikf( StatesGroup &state_in, Rgbmap_tracker &op_track )
         solution.setZero();
         meas_vec.setZero();
         avail_pt_count = 0;
+
+        // filter bad points 
         for ( auto it = op_track.m_map_rgb_pts_in_last_frame_pos.begin(); it != op_track.m_map_rgb_pts_in_last_frame_pos.end(); it++ )
         {
             pt_3d_w = ( ( RGB_pts * ) it->first )->get_pos();
@@ -1159,6 +1169,7 @@ void R3LIVE::service_VIO_update()
 
         if ( g_camera_frame_idx == 0 )
         {
+        
             std::vector< cv::Point2f >                pts_2d_vec;
             std::vector< std::shared_ptr< RGB_pts > > rgb_pts_vec;
             // while ( ( m_map_rgb_pts.is_busy() ) || ( ( m_map_rgb_pts.m_rgb_pts_vec.size() <= 100 ) ) )
@@ -1167,11 +1178,13 @@ void R3LIVE::service_VIO_update()
                 ros::spinOnce();
                 std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
             }
+            state_lio_file.close() ; 
             set_image_pose( img_pose, g_lio_state ); // For first frame pose, we suppose that the motion is static.
-            m_map_rgb_pts.selection_points_for_projection( img_pose, &rgb_pts_vec, &pts_2d_vec, m_track_windows_size / m_vio_scale_factor );
+
+            m_map_rgb_pts.selection_points_for_projection( img_pose, &rgb_pts_vec, &pts_2d_vec, 0.01 );
             op_track.init( img_pose, rgb_pts_vec, pts_2d_vec );
             g_camera_frame_idx++;
-            //std::cout << "22222222222222222222222222" << std::endl ; 
+
             continue;
         }
 
@@ -1195,13 +1208,14 @@ void R3LIVE::service_VIO_update()
             m_mutex_lio_process.unlock();
             continue;
         }
-        set_image_pose( img_pose, state_out );
+        set_image_pose( img_pose, g_lio_state );
+        m_mutex_lio_process.unlock();
 
         op_track.track_img( img_pose, -20 );
         g_cost_time_logger.record( tim, "Track_img" );
         // cout << "Track_img cost " << tim.toc( "Track_img" ) << endl;
         tim.tic( "Ransac" );
-        set_image_pose( img_pose, state_out );
+        //set_image_pose( img_pose, state_out );
 
         // ANCHOR -  remove point using PnP.
         if ( op_track.remove_outlier_using_ransac_pnp( img_pose ) == 0 )
@@ -1217,9 +1231,13 @@ void R3LIVE::service_VIO_update()
         tim.tic( "Vio_f2m" );
         res_photometric = vio_photometric( state_out, op_track, img_pose );
         g_cost_time_logger.record( tim, "Vio_f2m" );
+
+        m_mutex_lio_process.lock();
         //g_lio_state = state_out;
+        //set_image_pose( img_pose, g_lio_state );
+        m_mutex_lio_process.unlock();
         print_dash_board();
-        set_image_pose( img_pose, state_out );
+        
 
         if ( 1 )
         {
@@ -1252,7 +1270,6 @@ void R3LIVE::service_VIO_update()
         }
         // ANCHOR - render point cloud
         dump_lio_state_to_log( m_lio_state_fp );
-        m_mutex_lio_process.unlock();
         // cout << "Solve image pose cost " << tim.toc("Solve_pose") << endl;
         m_map_rgb_pts.update_pose_for_projection( img_pose, -0.4 );
         op_track.update_and_append_track_pts( img_pose, m_map_rgb_pts, m_track_windows_size / m_vio_scale_factor, 1000000 );
