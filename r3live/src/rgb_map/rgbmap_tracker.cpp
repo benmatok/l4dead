@@ -567,12 +567,18 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
         old_gray_rgb.at<cv::Vec3b>(row, col) = pixel ;
         int new_row = round(row - deform_row.at<float>(row,col) ) ; 
         int new_col = round(col- deform_col.at<float>(row,col) ) ;
-
+        cv::Point2f point  ; 
+        point.y = row - deform_row.at<float>(row,col) ; 
+        point.x =col- deform_col.at<float>(row,col) ; 
         if(new_row > new_gray_rgb.rows - 1 &&  new_row < 0 && new_col < 0 && new_col > new_gray_rgb.rows -1   ) 
         {
+             curr_tracked_pts.push_back(point ) ;
             continue ; 
         }
         new_gray_rgb.at<cv::Vec3b>(new_row, new_col) = pixel ;
+
+
+        curr_tracked_pts.push_back(point ) ;
 
 
 

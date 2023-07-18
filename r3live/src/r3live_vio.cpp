@@ -1228,7 +1228,7 @@ void R3LIVE::service_VIO_update()
         res_esikf = vio_esikf( state_out, op_track );
         g_cost_time_logger.record( tim, "Vio_f2f" );
         tim.tic( "Vio_f2m" );
-        res_photometric = vio_photometric( state_out, op_track, img_pose );
+        //res_photometric = vio_photometric( state_out, op_track, img_pose );
         g_cost_time_logger.record( tim, "Vio_f2m" );
 
         m_mutex_lio_process.lock();
