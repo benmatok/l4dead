@@ -489,8 +489,8 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
     new_gray.copyTo(original_new_gray);
 
     std::vector<int> scales = {10 ,9 , 7 , 5 , 3 ,1 };
-    std::vector<int> iter = {5,5 , 5,5 , 5 , 0 }  ;
-    std::vector<int> kernel_size = {5,5 , 5,5 , 5 , 0 } ;
+    std::vector<int> iter = {20,20 , 20,20 , 0 , 0 }  ;
+    std::vector<int> kernel_size = {5,5 , 5,5 , 0 , 0 } ;
     
     cv::Mat deform_row  ; // = cv::Mat::zeros(new_gray.rows, new_gray.cols, CV_32F) ; 
     cv::Mat deform_col  ; //= cv::Mat::zeros(new_gray.rows, new_gray.cols, CV_32F) ; 
@@ -565,46 +565,24 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
         int row = round(last_tracked_pts[i].y) ; 
         int col = round(last_tracked_pts[i].x) ; 
         old_gray_rgb.at<cv::Vec3b>(row, col) = pixel ;
-        
+        int new_row = round(row - deform_row.at<float>(row,col) ) ; 
+        int new_col = round(col- deform_col.at<float>(row,col) ) ;
 
-        if(row > new_gray.rows -2 || row  < 2 || col > new_gray.cols -2 || col < 2   ) 
+        if(new_row > new_gray_rgb.rows - 1 &&  new_row < 0 && new_col < 0 && new_col > new_gray_rgb.rows -1   ) 
         {
-            curr_tracked_pts.push_back(last_tracked_pts[i]) ; 
             continue ; 
         }
+        new_gray_rgb.at<cv::Vec3b>(new_row, new_col) = pixel ;
 
 
-
-        float  curr_deform_row  =  last_tracked_pts[i].y + get_interpulation_value(deform_row , row ,  col ,   7 ,  last_tracked_pts[i].y  ,last_tracked_pts[i].x   )  ;
-        float  curr_deform_col  = last_tracked_pts[i].x+ get_interpulation_value(deform_col , row ,  col ,   7 ,  last_tracked_pts[i].y  ,last_tracked_pts[i].x   ) ;
-        int curr_row_round = round(curr_deform_row) ; 
-        int curr_col_round = round(curr_deform_col) ;
-
-
-
-
-         if(curr_row_round <   new_gray.rows -2 &&  curr_row_round  > 2 && curr_col_round  < new_gray.cols -2  && curr_col_round > 2   ) 
-        {
-            new_gray_rgb.at<cv::Vec3b>(curr_row_round, curr_col_round) = pixel ; 
-        }
-
-
-
-
-        //std::cout << curr_deform_row << std::endl;
-
-        cv::Point2f point; 
-
-        point.y = curr_deform_row ;
-       point.x = curr_deform_col ; 
-       curr_tracked_pts.push_back(point) ; 
 
 
      }
 
      //cv::imwrite("/app/images_reg/" + std::to_string(m_frame_idx) + "_1" ,old_gray_rgb ) ;
       //cv::imwrite("/app/images_reg/new" + std::to_string(m_frame_idx) + ".png" ,new_gray_rgb) ;
-      cv::imwrite("/app/images_reg/old" + std::to_string(m_frame_idx) + ".png" ,old_gray_rgb) ;
+      cv::imwrite("/app/images_reg/" + std::to_string(m_frame_idx) + "old.png" ,old_gray_rgb) ;
+      cv::imwrite("/app/images_reg/" + std::to_string(m_frame_idx) + "new.png" ,new_gray_rgb) ;
 
 
 
@@ -616,26 +594,27 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
 
 
 
-    // cv::Mat after_solution(new_gray.rows, new_gray.cols, CV_32F) ;  //(new_gray.rows, new_gray.cols, CV_32F, cv::Scalar(0));
-    // for (int i = 0; i < after_solution.rows; i++)
-    //  {
-    //      for (int j = 0; j < after_solution.cols; j++)
-    //     {
+    cv::Mat after_solution(new_gray.rows, new_gray.cols, CV_32F) ;  //(new_gray.rows, new_gray.cols, CV_32F, cv::Scalar(0));
+    for (int i = 0; i < after_solution.rows; i++)
+     {
+         for (int j = 0; j < after_solution.cols; j++)
+        {
 
-
-    //         float  new_gray_value  =  get_interpulation_value(old_gray , i ,  j ,   7 , i +  deform_row.at<float>(i,j) ,j +  deform_col.at<float>(i,j)   )  ;
+            
+            float  new_gray_value  =  get_interpulation_value(old_gray , i ,  j ,   7 , i +  deform_row.at<float>(i,j) ,j +  deform_col.at<float>(i,j)   )  ;
         
-    //         after_solution.at<float>(i,j) = new_gray_value ;
-    //     }
+            after_solution.at<float>(i,j) = new_gray_value ;
+        }
 
 
-    // }
+     }
 
 
 
-    // cv::imwrite("/app/images/" + std::to_string(m_frame_idx) + "before_reg.png" ,255*old_gray ) ;
-    // cv::imwrite("/app/images/" + std::to_string(m_frame_idx) + "after_reg.png" ,255*after_solution ) ;
-    // cv::imwrite("/app/images/" + std::to_string(m_frame_idx) +"to_reg.png" ,255*new_gray ) ;
+
+     cv::imwrite("/app/images/" + std::to_string(m_frame_idx) + "before_reg.png" ,255*old_gray ) ;
+     cv::imwrite("/app/images/" + std::to_string(m_frame_idx) + "after_reg.png" ,255*after_solution ) ;
+     cv::imwrite("/app/images/" + std::to_string(m_frame_idx) +"to_reg.png" ,255*new_gray ) ;
 
 
 
