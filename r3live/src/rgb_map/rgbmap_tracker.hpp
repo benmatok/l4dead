@@ -91,6 +91,7 @@ class Rgbmap_tracker
     eigen_q                                   q_last_estimated_q = eigen_q::Identity();
     vec_3                                     t_last_estimated = vec_3( 0, 0, 0 );
     std::shared_ptr< LK_optical_flow_kernel > m_lk_optical_flow_kernel;
+    
     Rgbmap_tracker();
     ~Rgbmap_tracker(){};
 
@@ -130,13 +131,15 @@ class Rgbmap_tracker
         update_last_tracking_vector_and_ids();
     }
 
-    void init( const std::shared_ptr< Image_frame > &img_with_pose, std::vector< std::shared_ptr< RGB_pts > > &rgb_pts_vec, std::vector< cv::Point2f > &pts_proj_img_vec )
+    void init( std::shared_ptr< Image_frame > &img_with_pose, std::vector< std::shared_ptr< RGB_pts > > &rgb_pts_vec, std::vector< cv::Point2f > &pts_proj_img_vec )
     {
         set_track_pts( img_with_pose->m_img, rgb_pts_vec, pts_proj_img_vec );
         m_current_frame_time = img_with_pose->m_timestamp;
         m_last_frame_time = m_current_frame_time;
         std::vector< uchar > status;
-        m_lk_optical_flow_kernel->track_image( img_with_pose->m_img_gray, m_last_tracked_pts, m_current_tracked_pts, status );
+        //m_lk_optical_flow_kernel->track_image( img_with_pose->m_img_gray, m_last_tracked_pts, m_current_tracked_pts, status );
+        demon_track_image(img_with_pose->m_img_gray, m_last_tracked_pts, m_current_tracked_pts, status, img_with_pose);
+
     }
 
     void update_points( std::vector< cv::Point2f > &pts_vec, std::vector< int > &pts_ids )
@@ -171,4 +174,12 @@ class Rgbmap_tracker
     void track_img( std::shared_ptr< Image_frame > &img_pose, double dis = 2.0, int if_use_opencv = 1 );
     int get_all_tracked_pts( std::vector< std::vector< cv::Point2f > > *img_pt_vec = nullptr );
     int remove_outlier_using_ransac_pnp( std::shared_ptr< Image_frame > &img_pose, int if_remove_ourlier = 1 );
+    void demon_track_image( cv::Mat &curr_img, const std::vector<cv::Point2f> &last_tracked_pts,std::vector<cv::Point2f> &curr_tracked_pts, std::vector<uchar> &status, std::shared_ptr<Image_frame> &img_pose)  ;
+
+
+
+
+    void register_images(cv::Mat &new_gray , cv::Mat &old_gray  , cv::Mat &deform_row , cv::Mat &deform_col  , int num_iter , int kernel_size)  ; 
+
+    void demon_scale(cv::Mat &new_gray , cv::Mat &old_gray , cv::Mat &deform_row , cv::Mat &deform_col ,  int scale  , int iter , int kernel_size   , cv::Mat &deform_row_before , cv::Mat &deform_col_before) ;
 };

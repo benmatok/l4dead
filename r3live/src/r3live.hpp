@@ -278,6 +278,7 @@ public:
     int m_if_record_mvs = 0;
     cv::Mat intrinsic, dist_coeffs;
 
+    std::ofstream state_lio_file;
     mat_3_3 m_inital_rot_ext_i2c;
     vec_3  m_inital_pos_ext_i2c;
     Eigen::Matrix<double, 3, 3, Eigen::RowMajor> m_camera_intrinsic;
@@ -327,6 +328,9 @@ public:
     
     R3LIVE()
     {
+
+
+        state_lio_file.open("/app/state_lio.txt");
         pubLaserCloudFullRes = m_ros_node_handle.advertise<sensor_msgs::PointCloud2>("/cloud_registered", 100);
         pubLaserCloudEffect = m_ros_node_handle.advertise<sensor_msgs::PointCloud2>("/cloud_effected", 100);
         pubLaserCloudMap = m_ros_node_handle.advertise<sensor_msgs::PointCloud2>("/Laser_map", 100);

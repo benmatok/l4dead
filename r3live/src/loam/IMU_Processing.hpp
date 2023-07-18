@@ -40,7 +40,7 @@ class ImuProcess
   ImuProcess();
   ~ImuProcess();
 
-  void Process(const MeasureGroup &meas, StatesGroup &state, PointCloudXYZINormal::Ptr pcl_un_);
+  bool Process(const MeasureGroup &meas, StatesGroup &state, PointCloudXYZINormal::Ptr pcl_un_);
   void Reset();
   void IMU_Initial(const MeasureGroup &meas, StatesGroup &state, int &N);
 

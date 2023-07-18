@@ -1,7 +1,9 @@
 #include "IMU_Processing.hpp"
 #define COV_OMEGA_NOISE_DIAG 1e-1
 #define COV_ACC_NOISE_DIAG 0.4
+//#define COV_ACC_NOISE_DIAG 1.4
 #define COV_GYRO_NOISE_DIAG 0.2
+//#define COV_GYRO_NOISE_DIAG 1.2
 
 #define COV_BIAS_ACC_NOISE_DIAG 0.05
 #define COV_BIAS_GYRO_NOISE_DIAG 0.1
@@ -437,7 +439,7 @@ void ImuProcess::lic_point_cloud_undistort( const MeasureGroup &meas, const Stat
     }
 }
 
-void ImuProcess::Process( const MeasureGroup &meas, StatesGroup &stat, PointCloudXYZINormal::Ptr cur_pcl_un_)
+bool ImuProcess::Process( const MeasureGroup &meas, StatesGroup &stat, PointCloudXYZINormal::Ptr cur_pcl_un_)
 {
     // double t1, t2, t3;
     // t1 = omp_get_wtime();
@@ -445,7 +447,7 @@ void ImuProcess::Process( const MeasureGroup &meas, StatesGroup &stat, PointClou
     if ( meas.imu.empty() )
     {
         // std::cout << "no imu data" << std::endl;
-        return;
+        return imu_need_init_;
     };
     ROS_ASSERT( meas.lidar != nullptr );
 
@@ -468,7 +470,7 @@ void ImuProcess::Process( const MeasureGroup &meas, StatesGroup &stat, PointClou
                 cov_acc[ 1 ], cov_acc[ 2 ], cov_gyr[ 0 ], cov_gyr[ 1 ], cov_gyr[ 2 ] );
         }
 
-        return;
+        return imu_need_init_;
     }
 
     /// Undistort points： the first point is assummed as the base frame
@@ -496,6 +498,7 @@ void ImuProcess::Process( const MeasureGroup &meas, StatesGroup &stat, PointClou
 
     last_imu_ = meas.imu.back();
 
+    return imu_need_init_;
     // t3 = omp_get_wtime();
 
     // std::cout<<"[ IMU Process ]: Time: "<<t3 - t1<<std::endl;
