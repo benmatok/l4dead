@@ -1184,7 +1184,6 @@ void R3LIVE::service_VIO_update()
             m_map_rgb_pts.selection_points_for_projection( img_pose, &rgb_pts_vec, &pts_2d_vec, 0.01 );
             op_track.init( img_pose, rgb_pts_vec, pts_2d_vec );
             g_camera_frame_idx++;
-
             continue;
         }
 
