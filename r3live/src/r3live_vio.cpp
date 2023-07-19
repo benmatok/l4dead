@@ -1186,8 +1186,8 @@ void R3LIVE::service_VIO_update()
             g_camera_frame_idx++;
             continue;
         }
-
         g_camera_frame_idx++;
+         
         tim.tic( "Wait" );
         while ( g_camera_lidar_queue.if_camera_can_process() == false )
         {
@@ -1207,20 +1207,22 @@ void R3LIVE::service_VIO_update()
             m_mutex_lio_process.unlock();
             continue;
         }
+    
         set_image_pose( img_pose, g_lio_state );
-        m_mutex_lio_process.unlock();
-
+        
         op_track.track_img( img_pose, -20 );
         g_cost_time_logger.record( tim, "Track_img" );
         // cout << "Track_img cost " << tim.toc( "Track_img" ) << endl;
         tim.tic( "Ransac" );
         //set_image_pose( img_pose, state_out );
-
         // ANCHOR -  remove point using PnP.
         if ( op_track.remove_outlier_using_ransac_pnp( img_pose ) == 0 )
         {
             cout << ANSI_COLOR_RED_BOLD << "****** Remove_outlier_using_ransac_pnp error*****" << ANSI_COLOR_RESET << endl;
         }
+
+
+
         g_cost_time_logger.record( tim, "Ransac" );
         tim.tic( "Vio_f2f" );
         bool res_esikf = true, res_photometric = true;
@@ -1228,13 +1230,12 @@ void R3LIVE::service_VIO_update()
         res_esikf = vio_esikf( state_out, op_track );
         g_cost_time_logger.record( tim, "Vio_f2f" );
         tim.tic( "Vio_f2m" );
-        //res_photometric = vio_photometric( state_out, op_track, img_pose );
+        res_photometric = vio_photometric( state_out, op_track, img_pose );
         g_cost_time_logger.record( tim, "Vio_f2m" );
 
-        m_mutex_lio_process.lock();
         //g_lio_state = state_out;
         //set_image_pose( img_pose, g_lio_state );
-        m_mutex_lio_process.unlock();
+        //m_mutex_lio_process.unlock();
         print_dash_board();
         
 
@@ -1269,6 +1270,7 @@ void R3LIVE::service_VIO_update()
         }
         // ANCHOR - render point cloud
         dump_lio_state_to_log( m_lio_state_fp );
+        m_mutex_lio_process.unlock();
         // cout << "Solve image pose cost " << tim.toc("Solve_pose") << endl;
         m_map_rgb_pts.update_pose_for_projection( img_pose, -0.4 );
         op_track.update_and_append_track_pts( img_pose, m_map_rgb_pts, m_track_windows_size / m_vio_scale_factor, 1000000 );
@@ -1298,6 +1300,8 @@ void R3LIVE::service_VIO_update()
         {
             g_cost_time_logger.flush();
         }
+
+
         // cout << "Publish cost time " << tim.toc("Pub") << endl;
 
         //std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();

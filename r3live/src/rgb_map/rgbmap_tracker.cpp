@@ -467,7 +467,7 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
 
 
 
-
+    std::cout << m_frame_idx << std::endl;
 
 
  
@@ -525,8 +525,6 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
 
 
 
-    m_frame_idx+=1 ; 
-     m_old_gray = curr_img ;
 
     
      curr_tracked_pts.clear()  ;
@@ -552,11 +550,11 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
      {
         
 
-          RGB_pts *rgb_pts_ptr = ( ( RGB_pts * ) m_rgb_pts_ptr_vec_in_last_frame[ m_old_ids[ i ] ] );
-          double depth = (rgb_pts_ptr->get_pos() -  img_pose->m_pose_w2c_t ).norm() ; 
-         Eigen::Vector3i jet  = jetColorMap2(depth/3.0) ; 
+          //RGB_pts *rgb_pts_ptr = ( ( RGB_pts * ) m_rgb_pts_ptr_vec_in_last_frame[ m_old_ids[ i ] ] );
+          //double depth = (rgb_pts_ptr->get_pos() -  img_pose->m_pose_w2c_t ).norm() ; 
+         //Eigen::Vector3i jet  = jetColorMap2(depth/3.0) ; 
 
-         cv::Vec3b pixel(jet[2], jet[1], jet[0]);
+         //cv::Vec3b pixel(jet[2], jet[1], jet[0]);
 
 
 
@@ -564,20 +562,21 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
          
         int row = round(last_tracked_pts[i].y) ; 
         int col = round(last_tracked_pts[i].x) ; 
-        old_gray_rgb.at<cv::Vec3b>(row, col) = pixel ;
+       // old_gray_rgb.at<cv::Vec3b>(row, col) = pixel ;
         int new_row = round(row - deform_row.at<float>(row,col) ) ; 
         int new_col = round(col- deform_col.at<float>(row,col) ) ;
         cv::Point2f point  ; 
         point.y = row - deform_row.at<float>(row,col) ; 
         point.x =col- deform_col.at<float>(row,col) ; 
-        if(new_row > new_gray_rgb.rows - 1 &&  new_row < 0 && new_col < 0 && new_col > new_gray_rgb.rows -1   ) 
+        if(new_row > new_gray_rgb.rows - 1 || new_row < 0 || new_col < 0 || new_col > new_gray_rgb.rows -1   ) 
         {
+             status.push_back(0) ; 
              curr_tracked_pts.push_back(point ) ;
             continue ; 
         }
-        new_gray_rgb.at<cv::Vec3b>(new_row, new_col) = pixel ;
+        //new_gray_rgb.at<cv::Vec3b>(new_row, new_col) = pixel ;
 
-
+        status.push_back(1) ; 
         curr_tracked_pts.push_back(point ) ;
 
 
@@ -587,8 +586,8 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
 
      //cv::imwrite("/app/images_reg/" + std::to_string(m_frame_idx) + "_1" ,old_gray_rgb ) ;
       //cv::imwrite("/app/images_reg/new" + std::to_string(m_frame_idx) + ".png" ,new_gray_rgb) ;
-      cv::imwrite("/app/images_reg/" + std::to_string(m_frame_idx) + "old.png" ,old_gray_rgb) ;
-      cv::imwrite("/app/images_reg/" + std::to_string(m_frame_idx) + "new.png" ,new_gray_rgb) ;
+    //   cv::imwrite("/app/images_reg/" + std::to_string(m_frame_idx) + "old.png" ,old_gray_rgb) ;
+    //   cv::imwrite("/app/images_reg/" + std::to_string(m_frame_idx) + "new.png" ,new_gray_rgb) ;
 
 
 
@@ -600,27 +599,24 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
 
 
 
-    cv::Mat after_solution(new_gray.rows, new_gray.cols, CV_32F) ;  //(new_gray.rows, new_gray.cols, CV_32F, cv::Scalar(0));
-    for (int i = 0; i < after_solution.rows; i++)
-     {
-         for (int j = 0; j < after_solution.cols; j++)
-        {
+    // cv::Mat after_solution(new_gray.rows, new_gray.cols, CV_32F) ;  //(new_gray.rows, new_gray.cols, CV_32F, cv::Scalar(0));
+    // for (int i = 0; i < after_solution.rows; i++)
+    //  {
+    //      for (int j = 0; j < after_solution.cols; j++)
+    //     {
 
             
-            float  new_gray_value  =  get_interpulation_value(old_gray , i ,  j ,   7 , i +  deform_row.at<float>(i,j) ,j +  deform_col.at<float>(i,j)   )  ;
+    //         float  new_gray_value  =  get_interpulation_value(old_gray , i ,  j ,   7 , i +  deform_row.at<float>(i,j) ,j +  deform_col.at<float>(i,j)   )  ;
         
-            after_solution.at<float>(i,j) = new_gray_value ;
-        }
+    //         after_solution.at<float>(i,j) = new_gray_value ;
+    //     }
 
 
-     }
+    //  }
 
-
-
-
-     cv::imwrite("/app/images/" + std::to_string(m_frame_idx) + "before_reg.png" ,255*old_gray ) ;
-     cv::imwrite("/app/images/" + std::to_string(m_frame_idx) + "after_reg.png" ,255*after_solution ) ;
-     cv::imwrite("/app/images/" + std::to_string(m_frame_idx) +"to_reg.png" ,255*new_gray ) ;
+    //  cv::imwrite("/app/images/" + std::to_string(m_frame_idx) + "before_reg.png" ,255*old_gray ) ;
+    //  cv::imwrite("/app/images/" + std::to_string(m_frame_idx) + "after_reg.png" ,255*after_solution ) ;
+    //  cv::imwrite("/app/images/" + std::to_string(m_frame_idx) +"to_reg.png" ,255*new_gray ) ;
 
 
 
@@ -654,59 +650,66 @@ void Rgbmap_tracker::track_img(std::shared_ptr<Image_frame> &img_pose, double di
 
     // m_lk_optical_flow_kernel->track_image( frame_gray, m_last_tracked_pts, m_current_tracked_pts, status, 2 );
     // track_image(m_old_gray , frame_gray, m_last_tracked_pts, m_current_tracked_pts, status, 2 );
-    demon_track_image(frame_gray, m_last_tracked_pts, m_current_tracked_pts, status, img_pose);
+    std::cout << m_last_tracked_pts.size() << std::endl;
+     demon_track_image(frame_gray, m_last_tracked_pts, m_current_tracked_pts, status, img_pose);
 
-    // reduce_vector( m_last_tracked_pts, status );
-    // reduce_vector( m_old_ids, status );
-    // reduce_vector( m_current_tracked_pts, status );
 
-    // int     after_track = m_last_tracked_pts.size();
-    // cv::Mat mat_F;
+      reduce_vector( m_last_tracked_pts, status );
+      reduce_vector( m_old_ids, status );
+      reduce_vector( m_current_tracked_pts, status );
 
-    // tim.tic( "Reject_F" );
-    // unsigned int pts_before_F = m_last_tracked_pts.size();
-    // mat_F = cv::findFundamentalMat( m_last_tracked_pts, m_current_tracked_pts, cv::FM_RANSAC, 1.0, 0.997, status );
-    // unsigned int size_a = m_current_tracked_pts.size();
-    // reduce_vector( m_last_tracked_pts, status );
-    // reduce_vector( m_old_ids, status );
-    // reduce_vector( m_current_tracked_pts, status );
+     int     after_track = m_last_tracked_pts.size();
+     cv::Mat mat_F;
 
-    // m_map_rgb_pts_in_current_frame_pos.clear();
-    // double frame_time_diff = ( m_current_frame_time - m_last_frame_time );
-    // for ( uint i = 0; i < m_last_tracked_pts.size(); i++ )
-    // {
-    //     if ( img_pose->if_2d_points_available( m_current_tracked_pts[ i ].x, m_current_tracked_pts[ i ].y, 1.0, 0.05 ) )
-    //     {
-    //         RGB_pts *rgb_pts_ptr = ( ( RGB_pts * ) m_rgb_pts_ptr_vec_in_last_frame[ m_old_ids[ i ] ] );
-    //         m_map_rgb_pts_in_current_frame_pos[ rgb_pts_ptr ] = m_current_tracked_pts[ i ];
-    //         cv::Point2f pt_img_vel = ( m_current_tracked_pts[ i ] - m_last_tracked_pts[ i ] ) / frame_time_diff;
-    //         rgb_pts_ptr->m_img_pt_in_last_frame = vec_2( m_last_tracked_pts[ i ].x, m_last_tracked_pts[ i ].y );
-    //         rgb_pts_ptr->m_img_pt_in_current_frame =
-    //             vec_2( m_current_tracked_pts[ i ].x, m_current_tracked_pts[ i ].y );
-    //         rgb_pts_ptr->m_img_vel = vec_2( pt_img_vel.x, pt_img_vel.y );
-    //     }
-    // }
+     tim.tic( "Reject_F" );
+     unsigned int pts_before_F = m_last_tracked_pts.size();
+     mat_F = cv::findFundamentalMat( m_last_tracked_pts, m_current_tracked_pts, cv::FM_RANSAC, 1.0, 0.997, status );
+     unsigned int size_a = m_current_tracked_pts.size();
+     reduce_vector( m_last_tracked_pts, status );
+     reduce_vector( m_old_ids, status );
+     reduce_vector( m_current_tracked_pts, status );
 
-    // if ( dis > 0 )
-    // {
-    //     reject_error_tracking_pts( img_pose, dis );
-    // }
+//     // m_map_rgb_pts_in_current_frame_pos.clear();
+//     //  double frame_time_diff = ( m_current_frame_time - m_last_frame_time );
+//     //  for ( uint i = 0; i < m_last_tracked_pts.size(); i++ )
+//     //       {
+//     //     if ( img_pose->if_2d_points_available( m_current_tracked_pts[ i ].x, m_current_tracked_pts[ i ].y, 1.0, 0.05 ) )
+//     //      {
+//     //          RGB_pts *rgb_pts_ptr = ( ( RGB_pts * ) m_rgb_pts_ptr_vec_in_last_frame[ m_old_ids[ i ] ] );
+//     //          m_map_rgb_pts_in_current_frame_pos[ rgb_pts_ptr ] = m_current_tracked_pts[ i ];
+//     //          cv::Point2f pt_img_vel = ( m_current_tracked_pts[ i ] - m_last_tracked_pts[ i ] ) / frame_time_diff;
+//     //          rgb_pts_ptr->m_img_pt_in_last_frame = vec_2( m_last_tracked_pts[ i ].x, m_last_tracked_pts[ i ].y );
+//     //          rgb_pts_ptr->m_img_pt_in_current_frame = vec_2( m_current_tracked_pts[ i ].x, m_current_tracked_pts[ i ].y );
+//     //          rgb_pts_ptr->m_img_vel = vec_2( pt_img_vel.x, pt_img_vel.y );
+//     //      }
+//     //  }
 
-    // m_old_gray = frame_gray.clone();
-    // //draw debug image with currently tracked points
-    // cv::cvtColor(frame_gray, m_debug_track_img, cv::COLOR_GRAY2BGR);
-    // for ( uint i = 0; i < m_current_tracked_pts.size(); i++ )
-    // {
-    //     cv::arrowedLine(m_debug_track_img, m_last_tracked_pts[i], m_current_tracked_pts[i], cv::Scalar(0,0,255),3);
-    // }
+//     //  if ( dis > 0 )
+//     //       {
+//     //      reject_error_tracking_pts( img_pose, dis );
+//     //  }
 
-    // m_old_frame = m_current_frame;
-    // m_map_rgb_pts_in_last_frame_pos = m_map_rgb_pts_in_current_frame_pos;
-    // update_last_tracking_vector_and_ids();
 
-    // m_frame_idx++;
-    // m_last_frame_time = m_current_frame_time;
-}
+
+
+// //     //draw debug image with currently tracked points
+//     // cv::cvtColor(frame_gray, m_debug_track_img, cv::COLOR_GRAY2BGR);
+//     //  for ( uint i = 0; i < m_current_tracked_pts.size(); i++ )
+//     //  {
+//     //      cv::arrowedLine(m_debug_track_img, m_last_tracked_pts[i], m_current_tracked_pts[i], cv::Scalar(0,0,255),3);
+//     //  }
+
+
+
+
+
+     m_old_gray = frame_gray.clone();
+     m_old_frame = m_current_frame;
+   // m_map_rgb_pts_in_last_frame_pos = m_map_rgb_pts_in_current_frame_pos;
+    update_last_tracking_vector_and_ids();
+    m_frame_idx++;
+     m_last_frame_time = m_current_frame_time;
+  }
 
 int Rgbmap_tracker::get_all_tracked_pts(std::vector<std::vector<cv::Point2f>> *img_pt_vec)
 {

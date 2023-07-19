@@ -1159,7 +1159,6 @@ int R3LIVE::service_LIO_update()
 
             if (g_camera_lidar_queue.m_if_have_camera_data || (g_LiDAR_frame_index < 100)) // append point cloud to global map.
             {
-                std::cout << "hello  " <<  std::endl;
                 static std::vector<double> stastic_cost_time;
                 Common_tools::Timer tim;
                 // tim.tic();
@@ -1273,6 +1272,7 @@ int R3LIVE::service_LIO_update()
             fprintf(m_lio_costtime_fp, "%.5f %.5f\r\n", g_lio_state.last_update_time - g_camera_lidar_queue.m_first_imu_time, t5 - t0);
             fflush(m_lio_costtime_fp);
         }
+        std::cout << "finished  " << g_LiDAR_frame_index << std::endl;
         status = ros::ok();
         rate.sleep();
         std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
