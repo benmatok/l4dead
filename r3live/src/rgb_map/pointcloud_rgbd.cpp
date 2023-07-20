@@ -703,7 +703,7 @@ void Global_map::selection_points_for_projection(std::shared_ptr<Image_frame> &i
      //pcl::io::savePCDFileASCII("/app/clouds/" + std::to_string(counter) + ".pcd", *cloud);
      //cv::imwrite("/app/images/" + std::to_string(counter) + ".png" , gray_rgb) ;
 
-    counter+=1 ; 
+    //counter+=1 ; 
     
 
 }

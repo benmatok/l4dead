@@ -1171,6 +1171,21 @@ int R3LIVE::service_LIO_update()
                     m_number_of_new_visited_voxel = m_map_rgb_pts.append_points_to_global_map(
                         *laserCloudFullResColor, Measures.lidar_end_time - g_camera_lidar_queue.m_first_imu_time, &pts_last_hitted,
                         m_append_global_map_point_step);
+
+
+                    // std::ofstream xyz;
+                    // xyz.open("/app/xyz/" + std::to_string(g_LiDAR_frame_index) + ".txt");
+                    // for(int k =0 ; k <pts_last_hitted.size() ; k++  )
+                    // {   
+
+                    //     vec_3 point =  pts_last_hitted[k]->get_pos() ; 
+                    //     xyz<< std::setprecision(9) << point[0] << " " << point[1] << " " << point[2] << std::endl;
+                    // }
+                    // xyz.close();
+
+
+
+
                     m_map_rgb_pts.m_mutex_pts_last_visited->lock();
                     m_map_rgb_pts.m_pts_last_hitted = pts_last_hitted;
                     m_map_rgb_pts.m_mutex_pts_last_visited->unlock();

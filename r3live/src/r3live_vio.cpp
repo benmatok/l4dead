@@ -149,8 +149,8 @@ void R3LIVE::print_dash_board()
     out_str_line_1.insert( 14, ANSI_COLOR_RED_BOLD, 7 );
     out_str_line_1.insert( 0, ANSI_COLOR_WHITE_BOLD, 7 );
 
-    cout << out_str_line_1 << endl;
-    cout << out_str_line_2 << ANSI_COLOR_RESET << "          ";
+    cout << out_str_line_1 << endl;        
+    cout << out_str_line_2 << ANSI_COLOR_RESET << "          "     ;
     ANSI_SCREEN_FLUSH;
 }
 
@@ -1233,8 +1233,8 @@ void R3LIVE::service_VIO_update()
         res_photometric = vio_photometric( state_out, op_track, img_pose );
         g_cost_time_logger.record( tim, "Vio_f2m" );
 
-        //g_lio_state = state_out;
-        //set_image_pose( img_pose, g_lio_state );
+        // g_lio_state = state_out;
+        // set_image_pose( img_pose, g_lio_state );
         //m_mutex_lio_process.unlock();
         print_dash_board();
         
