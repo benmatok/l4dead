@@ -425,7 +425,8 @@ void R3LIVE::process_image(cv::Mat &temp_img, double msg_time)
     img_pose->init_cubic_interpolation();
     // img_pose->image_equalize();
    // m_camera_data_mutex.lock();
-    m_queue_image_with_pose.push(img_pose);
+    m_queue_image_with_pose.push(img_pose) ; 
+    //std::cout << msg_time << std::endl;
 
    // m_camera_data_mutex.unlock();
     total_frame_count++;
@@ -564,10 +565,10 @@ bool R3LIVE::vio_preintegration(StatesGroup &state_in, StatesGroup &state_out, d
     // if ( current_frame_time < state_in.last_update_time )
     // if ( std::abs(current_frame_time - state_in.last_update_time) < 0.01 )
     // if ( current_frame_time < state_in.last_update_time )
-    if (std::abs(current_frame_time - state_in.last_update_time) < 1e-5)
+    if (std::abs(current_frame_time - state_in.last_update_time ) < 1e-5 && current_frame_time!=state_in.last_update_time  )
     {
-        // cout << ANSI_COLOR_RED_BOLD << "Error current_frame_time <= state_in.last_update_time | " <<
-        // current_frame_time - state_in.last_update_time << ANSI_COLOR_RESET << endl;
+         cout << ANSI_COLOR_RED_BOLD << "Error current_frame_time <= state_in.last_update_time | " <<
+         current_frame_time - state_in.last_update_time << ANSI_COLOR_RESET << endl;
         return false;
     }
     mtx_buffer.lock();

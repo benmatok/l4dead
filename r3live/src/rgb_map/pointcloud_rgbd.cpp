@@ -559,7 +559,6 @@ void Global_map::selection_points_for_projection(std::shared_ptr<Image_frame> &i
 
     
     cv::Mat frame_gray = image_pose->m_img_gray;
-
     cv::Mat grayscale ; 
      frame_gray.convertTo(grayscale, CV_8UC1);
    cv::Mat gray_rgb(frame_gray.size(), CV_8UC3) ; 
@@ -700,7 +699,7 @@ void Global_map::selection_points_for_projection(std::shared_ptr<Image_frame> &i
     }
     //std::cout << "hello" << std::endl;
     //save_to_pcd("/app/clouds", std::to_string(counter) , 0 ) ;
-    pcl::io::savePCDFileASCII("/app/clouds/" + std::to_string(counter) + ".pcd", *cloud);
+    //pcl::io::savePCDFileASCII("/app/clouds/" + std::to_string(counter) + ".pcd", *cloud);
      //cv::imwrite("/app/images/" + std::to_string(counter) + ".png" , gray_rgb) ;
 
     counter+=1 ; 

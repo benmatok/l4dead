@@ -92,7 +92,7 @@ bool R3LIVE::LIO()
 
         if (ikdtree.Root_Node == nullptr )
         {
-            std::cout << "hello" << std::endl;
+            
             flg_map_initialized = false;
             //std::cout << "~~~~~~~ Initialize Map iKD-Tree Failed! ~~~~~~~" << std::endl;
             return 0 ;
@@ -525,57 +525,18 @@ bool R3LIVE::LIO()
                 pubLaserCloudFullRes.publish(laserCloudFullRes3);
             }
 
-            if ((g_LiDAR_frame_index < 100)) // append point cloud to global map.
+            if ( 1) // append point cloud to global map.
             {
                 static std::vector<double> stastic_cost_time;
                 Common_tools::Timer tim;
                 // tim.tic();
                 // ANCHOR - RGB maps update
                 wait_render_thread_finish();
-                if (m_if_record_mvs)
-                {
-                    std::vector<std::shared_ptr<RGB_pts>> pts_last_hitted;
-                    pts_last_hitted.reserve(1e6);
-                    m_number_of_new_visited_voxel = m_map_rgb_pts.append_points_to_global_map(
-                        *laserCloudFullResColor, Measures.lidar_end_time -first_imu_time, &pts_last_hitted,
-                        m_append_global_map_point_step);
-
-
-
-
-
-
-                    m_map_rgb_pts.m_pts_last_hitted = pts_last_hitted;
-
-
-
-
-                }
-                else
-                {
                     m_number_of_new_visited_voxel = m_map_rgb_pts.append_points_to_global_map(
                         *laserCloudFullResColor, Measures.lidar_end_time -first_imu_time, nullptr,
                         m_append_global_map_point_step);
-                }
                 stastic_cost_time.push_back(tim.toc(" ", 0));
             }
-            // if (0) // Uncomment this code scope to enable the publish of effective points.
-            // {
-            //     /******* Publish effective points *******/
-            //     laserCloudFullResColor->clear();
-            //     pcl::PointXYZI temp_point;
-            //     for (int i = 0; i < laserCloudSelNum; i++)
-            //     {
-            //         RGBpointBodyToWorld(&laserCloudOri->points[i], &temp_point);
-            //         laserCloudFullResColor->push_back(temp_point);
-            //     }
-            //     sensor_msgs::PointCloud2 laserCloudFullRes3;
-            //     pcl::toROSMsg(*laserCloudFullResColor, laserCloudFullRes3);
-            //     // laserCloudFullRes3.header.stamp = ros::Time::now(); //.fromSec(last_timestamp_lidar);
-            //     laserCloudFullRes3.header.stamp.fromSec(Measures.lidar_end_time); //.fromSec(last_timestamp_lidar);
-            //     laserCloudFullRes3.header.frame_id = "world";
-            //     pubLaserCloudEffect.publish(laserCloudFullRes3);
-            // }
 
             /******* Publish Maps:  *******/
             sensor_msgs::PointCloud2 laserCloudMap;
@@ -645,6 +606,7 @@ bool R3LIVE::LIO()
             s_plot5[time_log_counter] = t5 - t0;
             s_plot6[time_log_counter] = readd_box_time;
         }
+        g_LiDAR_frame_index++ ; 
     return 1;
 
 }
@@ -657,26 +619,27 @@ bool R3LIVE::VIO()
 
         std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
         Common_tools::Timer tim;
-
-        std::cout << "hiii" << std::endl;
         std::shared_ptr<Image_frame> img_pose ; 
-        m_queue_image_with_pose.try_pop(img_pose);
-        double message_time = img_pose->m_timestamp;
-        bool p = true ; 
+        //m_queue_image_with_pose.try_pop(img_pose);
+        double message_time =0;
         while(  lidar_time - message_time >0.01   )
         {
-            std::cout << lidar_time - message_time << std::endl;
-            if(     message_time > lidar_time   )
+            if(!m_queue_image_with_pose.empty() )
             {
-                return 0 ; 
+                m_queue_image_with_pose.try_pop(img_pose);
+               message_time = img_pose->m_timestamp;
             }
-            m_queue_image_with_pose.try_pop(img_pose);
-            double message_time = img_pose->m_timestamp;
 
         }
 
-        std::cout << message_time - lidar_time<< std::endl;
 
+
+         if(message_time -lidar_time  > 0.01  )
+         {
+
+            return 0 ; 
+         }
+        std::cout <<  "hello"  << std::endl;
         img_pose->set_frame_idx(g_camera_frame_idx);
 
         if (g_camera_frame_idx == 0)
@@ -685,9 +648,8 @@ bool R3LIVE::VIO()
             std::vector<cv::Point2f> pts_2d_vec;
             std::vector<std::shared_ptr<RGB_pts>> rgb_pts_vec;
 
-            state_lio_file.close();
-            set_image_pose(img_pose, g_lio_state); // For first frame pose, we suppose that the motion is static.
 
+            set_image_pose(img_pose, g_lio_state); // For first frame pose, we suppose that the motion is static.
             m_map_rgb_pts.selection_points_for_projection(img_pose, &rgb_pts_vec, &pts_2d_vec, 0.01);
             op_track.init(img_pose, rgb_pts_vec, pts_2d_vec);
             g_camera_frame_idx++;
@@ -698,17 +660,18 @@ bool R3LIVE::VIO()
 
         StatesGroup state_out;
         m_cam_measurement_weight = std::max(0.001, std::min(5.0 / m_number_of_new_visited_voxel, 0.01));
-
-
-
-        if (vio_preintegration(g_lio_state, state_out, img_pose->m_timestamp + g_lio_state.td_ext_i2c) == false )
-        {
-            return 0 ; 
-        }
-
+        std::cout <<  "byeeee"  << std::endl;
+        state_out = g_lio_state;
+        // if (vio_preintegration(g_lio_state, state_out, img_pose->m_timestamp + g_lio_state.td_ext_i2c) == false )
+        // {
+        //     return 0 ; 
+        // }
+        std::cout <<  "byeeee"  << std::endl;
+    
         set_image_pose(img_pose, state_out);
          //laser_to_camera(laserCloudFullRes2 ,img_pose,  g_lio_state , counter , lidar_time , outfile ); 
          //counter++ ; 
+
         op_track.track_img(img_pose, -20);
          g_cost_time_logger.record(tim, "Track_img");
         // cout << "Track_img cost " << tim.toc( "Track_img" ) << endl;
@@ -810,6 +773,7 @@ void R3LIVE::single_thread()
 
     while (ros::ok())
     {
+        std::cout << "start lio " << std::endl;
         while( ! LIO())
         {
             ros::spinOnce();
@@ -820,8 +784,8 @@ void R3LIVE::single_thread()
         }
         std::cout << "finish lio"  << std::endl;
 
-        VIO() ; 
-        std::cout << "bye "  << std::endl;
+        bool is_vio = VIO() ; 
+        std::cout << is_vio << std::endl;
   
 
 
