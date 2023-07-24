@@ -138,7 +138,7 @@ class Rgbmap_tracker
         m_last_frame_time = m_current_frame_time;
         std::vector< uchar > status;
         //m_lk_optical_flow_kernel->track_image( img_with_pose->m_img_gray, m_last_tracked_pts, m_current_tracked_pts, status );
-        demon_track_image(img_with_pose->m_img_gray, m_last_tracked_pts, m_current_tracked_pts, status, img_with_pose);
+        //demon_track_image(img_with_pose->m_img_gray, m_last_tracked_pts, m_current_tracked_pts, status, img_with_pose);
 
     }
 

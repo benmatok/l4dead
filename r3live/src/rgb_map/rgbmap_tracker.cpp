@@ -65,7 +65,7 @@ void Rgbmap_tracker::update_and_append_track_pts(std::shared_ptr<Image_frame> &i
     tim.tic();
     double u_d, v_d;
     int u_i, v_i;
-    double max_allow_repro_err = 10.0 * img_pose->m_img_cols / 320.0;
+    double max_allow_repro_err =   2.0 * img_pose->m_img_cols / 320.0;
     Hash_map_2d<int, float> map_2d_pts_occupied;
 
     for (auto it = m_map_rgb_pts_in_last_frame_pos.begin(); it != m_map_rgb_pts_in_last_frame_pos.end();)

@@ -700,10 +700,10 @@ void Global_map::selection_points_for_projection(std::shared_ptr<Image_frame> &i
     }
     //std::cout << "hello" << std::endl;
     //save_to_pcd("/app/clouds", std::to_string(counter) , 0 ) ;
-     //pcl::io::savePCDFileASCII("/app/clouds/" + std::to_string(counter) + ".pcd", *cloud);
+    pcl::io::savePCDFileASCII("/app/clouds/" + std::to_string(counter) + ".pcd", *cloud);
      //cv::imwrite("/app/images/" + std::to_string(counter) + ".png" , gray_rgb) ;
 
-    //counter+=1 ; 
+    counter+=1 ; 
     
 
 }
