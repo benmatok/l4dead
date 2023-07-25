@@ -622,24 +622,24 @@ bool R3LIVE::VIO()
         std::shared_ptr<Image_frame> img_pose ; 
         //m_queue_image_with_pose.try_pop(img_pose);
         double message_time =0;
-        while(  lidar_time - message_time >0.01   )
-        {
-            if(!m_queue_image_with_pose.empty() )
-            {
-                m_queue_image_with_pose.try_pop(img_pose);
-               message_time = img_pose->m_timestamp;
-            }
+        
+        // while(  lidar_time - message_time >0.01   )
+        // {
+        //     if(!m_queue_image_with_pose.empty() )
+        //     {
+        //         m_queue_image_with_pose.try_pop(img_pose);
+        //        message_time = img_pose->m_timestamp;
+        //     }
 
-        }
+        // }
 
 
 
-         if(message_time -lidar_time  > 0.01  )
-         {
+        //  if(message_time -lidar_time  > 0.01  )
+        //  {
 
-            return 0 ; 
-         }
-        std::cout <<  "hello"  << std::endl;
+        //     return 0 ; 
+        //  }
         img_pose->set_frame_idx(g_camera_frame_idx);
 
         if (g_camera_frame_idx == 0)
@@ -660,13 +660,11 @@ bool R3LIVE::VIO()
 
         StatesGroup state_out;
         m_cam_measurement_weight = std::max(0.001, std::min(5.0 / m_number_of_new_visited_voxel, 0.01));
-        std::cout <<  "byeeee"  << std::endl;
         state_out = g_lio_state;
-        // if (vio_preintegration(g_lio_state, state_out, img_pose->m_timestamp + g_lio_state.td_ext_i2c) == false )
-        // {
-        //     return 0 ; 
-        // }
-        std::cout <<  "byeeee"  << std::endl;
+        if (vio_preintegration(g_lio_state, state_out, img_pose->m_timestamp + g_lio_state.td_ext_i2c) == false )
+        {
+            return 0 ; 
+        }
     
         set_image_pose(img_pose, state_out);
          //laser_to_camera(laserCloudFullRes2 ,img_pose,  g_lio_state , counter , lidar_time , outfile ); 
@@ -770,22 +768,31 @@ void R3LIVE::single_thread()
     m_map_rgb_pts.m_maximum_depth_for_projection = m_tracker_maximum_depth;
     cv::imshow( "Control panel", generate_control_panel_img().clone() );
 
-
+    bool succses_first_lio = 0 ; 
     while (ros::ok())
     {
-        std::cout << "start lio " << std::endl;
-        while( ! LIO())
+
+
+        if(!vio_or_lio.empty() )
         {
-            ros::spinOnce();
-            std::this_thread::sleep_for(std::chrono::milliseconds(THREAD_SLEEP_TIM));
-            std::this_thread::yield();
-            continue;
+        int msg_type ; 
+        vio_or_lio.try_pop(msg_type) ; 
+        if(msg_type == 1 )
+        {
+        std::cout << "start lio " << std::endl;
+        succses_first_lio = LIO() ; 
+        std::cout << "finish lio"  << std::endl;
+        }
+
+        if(msg_type == 0 && succses_first_lio )
+        {
+            std::cout << "start VIO " << std::endl;
+            VIO() ; 
+            std::cout << "end VIO " << std::endl;
 
         }
-        std::cout << "finish lio"  << std::endl;
 
-        bool is_vio = VIO() ; 
-        std::cout << is_vio << std::endl;
+        }
   
 
 

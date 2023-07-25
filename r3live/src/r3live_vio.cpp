@@ -341,6 +341,7 @@ void R3LIVE::image_comp_callback(const sensor_msgs::CompressedImageConstPtr &msg
 // ANCHOR - image_callback
 void R3LIVE::image_callback(const sensor_msgs::ImageConstPtr &msg)
 {
+    vio_or_lio.push(0) ; 
     static std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 
     std::unique_lock<std::mutex> lock(mutex_image_callback);
@@ -565,7 +566,11 @@ bool R3LIVE::vio_preintegration(StatesGroup &state_in, StatesGroup &state_out, d
     // if ( current_frame_time < state_in.last_update_time )
     // if ( std::abs(current_frame_time - state_in.last_update_time) < 0.01 )
     // if ( current_frame_time < state_in.last_update_time )
-    if (std::abs(current_frame_time - state_in.last_update_time ) < 1e-5 && current_frame_time!=state_in.last_update_time  )
+    if(current_frame_time == state_in.last_update_time )
+    {
+        return 1 ; 
+    }
+    if (   current_frame_time <  state_in.last_update_time   )
     {
          cout << ANSI_COLOR_RED_BOLD << "Error current_frame_time <= state_in.last_update_time | " <<
          current_frame_time - state_in.last_update_time << ANSI_COLOR_RESET << endl;

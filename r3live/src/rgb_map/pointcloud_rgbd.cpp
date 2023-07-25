@@ -741,7 +741,6 @@ void Global_map::save_to_pcd(std::string dir_name, std::string _file_name, int s
         pc_rgb.points[ pt_count ].b = m_rgb_pts_vec[ i ]->m_rgb[ 0 ];
         pt_count++;
     }
-    std::cout << pt_count << std::endl;
     cout << ANSI_DELETE_CURRENT_LINE  << "Saving offline map 100% ..." << endl;
     pc_rgb.resize(pt_count);
     cout << "Total have " << pt_count << " points." << endl;

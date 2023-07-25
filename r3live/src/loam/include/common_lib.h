@@ -241,7 +241,6 @@ struct Camera_Lidar_queue
         {
             // LiDAR data need process first.
             // return true;
-            std::cout << lidar_last_time - cam_last_time << std::endl;
             return false;
         }
         else

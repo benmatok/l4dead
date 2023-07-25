@@ -245,6 +245,7 @@ public:
     std::mutex m_camera_data_mutex;
     double m_camera_start_ros_tim = -3e8;
     tbb::concurrent_queue <std::shared_ptr<Image_frame> > m_queue_image_with_pose;
+    tbb::concurrent_queue < int  >  vio_or_lio ;
     std::list<std::shared_ptr<Image_frame>> g_image_vec;
     Eigen::Matrix3d g_cam_K;
     Eigen::Matrix<double, 5, 1> g_cam_dist;
