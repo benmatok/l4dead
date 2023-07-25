@@ -780,7 +780,7 @@ void R3LIVE::single_thread()
         {
         int msg_type ; 
         vio_or_lio.try_pop(msg_type) ; 
-        if(msg_type == 1  <100 )
+        if(msg_type == 1   )
         {
         std::cout << "start lio " << std::endl;
         succses_first_lio = LIO() ; 
