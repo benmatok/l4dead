@@ -73,7 +73,7 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
 #include <sensor_msgs/PointCloud2.h>
 #include <tf/transform_datatypes.h>
 #include <tf/transform_broadcaster.h>
-
+#include <tbb/concurrent_queue.h>
 #include <geometry_msgs/Vector3.h>
 #include <FOV_Checker/FOV_Checker.h>
 
@@ -149,6 +149,7 @@ public:
 
     int laserCloudValidNum = 0;
     int laserCloudSelNum = 0;
+    std::shared_ptr<ImuProcess> p_imu  = std::make_shared<ImuProcess>() ;
 
     // std::vector<double> T1, T2, s_plot, s_plot2, s_plot3, s_plot4, s_plot5, s_plot6;
     double T1[MAXN], T2[MAXN], s_plot[MAXN], s_plot2[MAXN], s_plot3[MAXN], s_plot4[MAXN], s_plot5[MAXN], s_plot6[MAXN];
@@ -174,7 +175,7 @@ public:
     Eigen::Vector3d position_last = Zero3d;
     double copy_time, readd_time, fov_check_time, readd_box_time, delete_box_time;
     double kdtree_incremental_time, kdtree_search_time;
-
+    double first_imu_time =  -1 ; 
     std::deque<sensor_msgs::PointCloud2::ConstPtr> lidar_buffer;
     std::deque<sensor_msgs::Imu::ConstPtr> imu_buffer_lio;
     std::deque<sensor_msgs::Imu::ConstPtr> imu_buffer_vio;
@@ -197,7 +198,6 @@ public:
     bool cube_updated[laserCloudNum];
     int laserCloudValidInd[laserCloudNum];
     pcl::PointCloud<pcl::PointXYZI>::Ptr laserCloudFullResColor; //(new pcl::PointCloud<pcl::PointXYZI>());
-
     KD_TREE ikdtree;
 
     enum LID_TYPE
@@ -244,13 +244,15 @@ public:
     std::vector< std::shared_ptr <ros::Publisher> > m_pub_rgb_render_pointcloud_ptr_vec;
     std::mutex m_camera_data_mutex;
     double m_camera_start_ros_tim = -3e8;
-    std::deque<sensor_msgs::ImageConstPtr> m_queue_image_msg;
-    std::deque<std::shared_ptr<Image_frame>> m_queue_image_with_pose;
+    tbb::concurrent_queue <std::shared_ptr<Image_frame> > m_queue_image_with_pose;
+    tbb::concurrent_queue < int  >  vio_or_lio ;
     std::list<std::shared_ptr<Image_frame>> g_image_vec;
     Eigen::Matrix3d g_cam_K;
     Eigen::Matrix<double, 5, 1> g_cam_dist;
     double m_vio_scale_factor = 1.0;
     cv::Mat m_ud_map1, m_ud_map2;
+
+     Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> G, H_T_H, I_STATE;
 
     int                          g_camera_frame_idx = 0;
     int                          g_LiDAR_frame_index = 0;
@@ -277,7 +279,7 @@ public:
     double m_tracker_maximum_depth = 200;
     int m_if_record_mvs = 0;
     cv::Mat intrinsic, dist_coeffs;
-
+    double lidar_time = 0 ; 
     std::ofstream state_lio_file;
     mat_3_3 m_inital_rot_ext_i2c;
     vec_3  m_inital_pos_ext_i2c;
@@ -318,6 +320,7 @@ public:
     void service_process_img_buffer();
     void service_pub_rgb_maps();
     char cv_keyboard_callback();
+    bool VIO() ; 
     void set_initial_state_cov(StatesGroup &stat);
     cv::Mat generate_control_panel_img();
     // ANCHOR -  service_pub_rgb_maps
@@ -328,8 +331,9 @@ public:
     
     R3LIVE()
     {
-
-
+        G.setZero();
+    H_T_H.setZero();
+    I_STATE.setIdentity();
         state_lio_file.open("/app/state_lio.txt");
         pubLaserCloudFullRes = m_ros_node_handle.advertise<sensor_msgs::PointCloud2>("/cloud_registered", 100);
         pubLaserCloudEffect = m_ros_node_handle.advertise<sensor_msgs::PointCloud2>("/cloud_effected", 100);
@@ -447,7 +451,7 @@ public:
 
         m_lio_state_fp = fopen( std::string(m_map_output_dir).append("/lic_lio.log").c_str(), "w+");
         m_lio_costtime_fp = fopen(std::string(m_map_output_dir).append("/lic_lio_costtime.log").c_str(), "w+");
-        m_thread_pool_ptr->commit_task(&R3LIVE::service_LIO_update, this);
+        m_thread_pool_ptr->commit_task(&R3LIVE::single_thread, this);
              
     }
     ~R3LIVE(){};
@@ -473,9 +477,10 @@ public:
     void feat_points_cbk(const sensor_msgs::PointCloud2::ConstPtr &msg_in);
     void wait_render_thread_finish();
     bool get_pointcloud_data_from_ros_message(sensor_msgs::PointCloud2::ConstPtr & msg, pcl::PointCloud<pcl::PointXYZINormal> & pcl_pc);
-    int service_LIO_update();
+   // int service_LIO_update();
     void publish_render_pts( ros::Publisher &pts_pub, Global_map &m_map_rgb_pts );
     void print_dash_board();
-
+    bool LIO() ; 
+    void single_thread() ; 
 
 };

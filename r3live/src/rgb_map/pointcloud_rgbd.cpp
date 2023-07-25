@@ -559,7 +559,6 @@ void Global_map::selection_points_for_projection(std::shared_ptr<Image_frame> &i
 
     
     cv::Mat frame_gray = image_pose->m_img_gray;
-
     cv::Mat grayscale ; 
      frame_gray.convertTo(grayscale, CV_8UC1);
    cv::Mat gray_rgb(frame_gray.size(), CV_8UC3) ; 
@@ -700,7 +699,7 @@ void Global_map::selection_points_for_projection(std::shared_ptr<Image_frame> &i
     }
     //std::cout << "hello" << std::endl;
     //save_to_pcd("/app/clouds", std::to_string(counter) , 0 ) ;
-     //pcl::io::savePCDFileASCII("/app/clouds/" + std::to_string(counter) + ".pcd", *cloud);
+    //pcl::io::savePCDFileASCII("/app/clouds/" + std::to_string(counter) + ".pcd", *cloud);
      //cv::imwrite("/app/images/" + std::to_string(counter) + ".png" , gray_rgb) ;
 
     counter+=1 ; 
@@ -742,7 +741,6 @@ void Global_map::save_to_pcd(std::string dir_name, std::string _file_name, int s
         pc_rgb.points[ pt_count ].b = m_rgb_pts_vec[ i ]->m_rgb[ 0 ];
         pt_count++;
     }
-    std::cout << pt_count << std::endl;
     cout << ANSI_DELETE_CURRENT_LINE  << "Saving offline map 100% ..." << endl;
     pc_rgb.resize(pt_count);
     cout << "Total have " << pt_count << " points." << endl;
