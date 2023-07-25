@@ -431,8 +431,8 @@ bool R3LIVE::LIO()
                         auto vec = state_propagate - g_lio_state;
                         solution = K * (meas_vec - Hsub * vec.block<6, 1>(0, 0));
 
-                        g_lio_state = state_propagate + solution;
-                        g_lio_state = g_lio_state.normalize_if_large(1);
+                        //g_lio_state = state_propagate + solution;
+                        //g_lio_state = g_lio_state.normalize_if_large(1);
 
 
                         if(j==19)
@@ -442,11 +442,11 @@ bool R3LIVE::LIO()
                         //{
                         //outfile<< std::setprecision(9) << meas_vec(iter) << std::endl ; 
                         //}
-                        g_lio_state.last_update_time = Measures.lidar_end_time;
+                        //g_lio_state.last_update_time = Measures.lidar_end_time;
                         euler_cur = RotMtoEuler( g_lio_state.rot_end );
                         dump_lio_state_to_log( m_lio_state_fp );
-                        G.block<DIM_OF_STATES, 6>(0, 0) = K * Hsub;
-                        g_lio_state.cov = (I_STATE - G) * g_lio_state.cov;
+                        //G.block<DIM_OF_STATES, 6>(0, 0) = K * Hsub;
+                        //g_lio_state.cov = (I_STATE - G) * g_lio_state.cov;
                         position_last = g_lio_state.pos_end;
                         solve_time += omp_get_wtime() - solve_start;
                         }
@@ -615,31 +615,30 @@ bool R3LIVE::LIO()
 bool R3LIVE::VIO()
 {
 
-
-
+        std::cout << "hello" << std::endl;
         std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
         Common_tools::Timer tim;
         std::shared_ptr<Image_frame> img_pose ; 
         //m_queue_image_with_pose.try_pop(img_pose);
         double message_time =0;
+        while(  lidar_time - message_time >0.01   )
+        {
+            if(!m_queue_image_with_pose.empty() )
+            {
+                m_queue_image_with_pose.try_pop(img_pose);
+               message_time = img_pose->m_timestamp;
+            }
+
+        }
         
-        // while(  lidar_time - message_time >0.01   )
-        // {
-        //     if(!m_queue_image_with_pose.empty() )
-        //     {
-        //         m_queue_image_with_pose.try_pop(img_pose);
-        //        message_time = img_pose->m_timestamp;
-        //     }
-
-        // }
 
 
 
-        //  if(message_time -lidar_time  > 0.01  )
-        //  {
+         if(message_time -lidar_time  > 0.01  )
+         {
 
-        //     return 0 ; 
-        //  }
+            return 0 ; 
+         }
         img_pose->set_frame_idx(g_camera_frame_idx);
 
         if (g_camera_frame_idx == 0)
@@ -665,6 +664,8 @@ bool R3LIVE::VIO()
         {
             return 0 ; 
         }
+        
+        
     
         set_image_pose(img_pose, state_out);
          //laser_to_camera(laserCloudFullRes2 ,img_pose,  g_lio_state , counter , lidar_time , outfile ); 
@@ -691,8 +692,8 @@ bool R3LIVE::VIO()
         res_photometric = vio_photometric(state_out, op_track, img_pose);
         g_cost_time_logger.record(tim, "Vio_f2m");
 
-        // g_lio_state = state_out;
-        // set_image_pose( img_pose, g_lio_state );
+        g_lio_state = state_out;
+        set_image_pose( img_pose, g_lio_state );
         print_dash_board();
 
         if (1)
@@ -769,15 +770,17 @@ void R3LIVE::single_thread()
     cv::imshow( "Control panel", generate_control_panel_img().clone() );
 
     bool succses_first_lio = 0 ; 
+    int frame_number = 0 ;
     while (ros::ok())
     {
+
 
 
         if(!vio_or_lio.empty() )
         {
         int msg_type ; 
         vio_or_lio.try_pop(msg_type) ; 
-        if(msg_type == 1 )
+        if(msg_type == 1  <100 )
         {
         std::cout << "start lio " << std::endl;
         succses_first_lio = LIO() ; 
@@ -793,6 +796,7 @@ void R3LIVE::single_thread()
         }
 
         }
+        
   
 
 
