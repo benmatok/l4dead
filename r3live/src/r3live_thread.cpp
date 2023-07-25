@@ -431,8 +431,8 @@ bool R3LIVE::LIO()
                         auto vec = state_propagate - g_lio_state;
                         solution = K * (meas_vec - Hsub * vec.block<6, 1>(0, 0));
 
-                        //g_lio_state = state_propagate + solution;
-                        //g_lio_state = g_lio_state.normalize_if_large(1);
+                        g_lio_state = state_propagate + solution;
+                        g_lio_state = g_lio_state.normalize_if_large(1);
 
 
                         if(j==19)
@@ -445,8 +445,8 @@ bool R3LIVE::LIO()
                         //g_lio_state.last_update_time = Measures.lidar_end_time;
                         euler_cur = RotMtoEuler( g_lio_state.rot_end );
                         dump_lio_state_to_log( m_lio_state_fp );
-                        //G.block<DIM_OF_STATES, 6>(0, 0) = K * Hsub;
-                        //g_lio_state.cov = (I_STATE - G) * g_lio_state.cov;
+                        G.block<DIM_OF_STATES, 6>(0, 0) = K * Hsub;
+                        g_lio_state.cov = (I_STATE - G) * g_lio_state.cov;
                         position_last = g_lio_state.pos_end;
                         solve_time += omp_get_wtime() - solve_start;
                         }
