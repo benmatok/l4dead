@@ -427,27 +427,43 @@ bool R3LIVE::LIO()
                         Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> &&K_1 = (H_T_H + (g_lio_state.cov / LASER_POINT_COV).inverse()).inverse();
 
                         K = K_1.block<DIM_OF_STATES, 6>(0, 0) * Hsub_T;
-
+                        
                         auto vec = state_propagate - g_lio_state;
+
                         solution = K * (meas_vec - Hsub * vec.block<6, 1>(0, 0));
+                        
+                        //g_lio_state = state_propagate + solution;
 
-                        g_lio_state = state_propagate + solution;
-                        g_lio_state = g_lio_state.normalize_if_large(1);
+                         //g_lio_state = g_lio_state.normalize_if_large(1);
 
+                         StatesGroup try_update = state_propagate + solution ;
+                          try_update = try_update.normalize_if_large(1) ; 
+
+                        vec_3 rot_resu = SO3_LOG(try_update.rot_end) * 57.3  - SO3_LOG(state_propagate.rot_end) * 57.3 ;
+                        mat_3_3 rot_cov = state_propagate.cov.block(0, 0, 3, 3) ; 
+                        double mahalanobis_distance = std::sqrt(rot_resu.transpose() *rot_cov.inverse() * rot_resu ) ; 
+                        std::ofstream outfile_mah("/app/mahalanobis_distance.txt", std::ios::app);
+                        outfile_mah <<  std::setprecision(16) << try_update.last_update_time << " "<<mahalanobis_distance << std::endl ; 
+                        outfile_mah.close() ;
+                         if(mahalanobis_distance<264)
+                         {
+                             g_lio_state = try_update ; 
+
+                         }
 
                         if(j==19)
                         {
 
-                        //for(int iter = 0 ; iter < meas_vec.size() ; iter++)
-                        //{
-                        //outfile<< std::setprecision(9) << meas_vec(iter) << std::endl ; 
-                        //}
-                        //g_lio_state.last_update_time = Measures.lidar_end_time;
+                        // for(int iter = 0 ; iter < meas_vec.size() ; iter++)
+                        // {
+                        // outfile<< std::setprecision(9) << meas_vec(iter) << std::endl ; 
+                        // }
+                        g_lio_state.last_update_time = Measures.lidar_end_time;
                         euler_cur = RotMtoEuler( g_lio_state.rot_end );
                         dump_lio_state_to_log( m_lio_state_fp );
-                        G.block<DIM_OF_STATES, 6>(0, 0) = K * Hsub;
+                         G.block<DIM_OF_STATES, 6>(0, 0) = K * Hsub;
                         g_lio_state.cov = (I_STATE - G) * g_lio_state.cov;
-                        position_last = g_lio_state.pos_end;
+                         position_last = g_lio_state.pos_end;
                         solve_time += omp_get_wtime() - solve_start;
                         }
                     }
@@ -768,6 +784,13 @@ void R3LIVE::single_thread()
     m_map_rgb_pts.m_minimum_depth_for_projection = m_tracker_minimum_depth;
     m_map_rgb_pts.m_maximum_depth_for_projection = m_tracker_maximum_depth;
     cv::imshow( "Control panel", generate_control_panel_img().clone() );
+    std::ofstream outfile_vec ;
+    outfile_vec.open("/app/mahalanobis_distance.txt");
+    outfile_vec.close() ; 
+
+
+
+
 
     bool succses_first_lio = 0 ; 
     int frame_number = 0 ;

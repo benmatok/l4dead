@@ -441,27 +441,25 @@ public:
         return a;
     }
 
-    static std::string to_string(const StatesGroup &state, std::string str = std::string("State: "))
+    static std::string to_string(const StatesGroup &state, std::string str = std::string(""))
     {
         vec_3 angle_axis = SO3_LOG(state.rot_end) * 57.3;
         char state_str[2000];
         int cx;
         std::string msg="";
-        snprintf(state_str, 2000, "%s |", str.c_str());
+        snprintf(state_str,2000, "%.10f ", state.last_update_time);
         msg.append(state_str);
-        snprintf(state_str,2000, "[%.5f] | ", state.last_update_time);
+        snprintf(state_str,2000, "%.5f %.5f %.5f ", angle_axis(0), angle_axis(1), angle_axis(2));
         msg.append(state_str);
-        snprintf(state_str,2000, "(%.3f, %.3f, %.3f) | ", angle_axis(0), angle_axis(1), angle_axis(2));
+        snprintf(state_str,2000,"%.5f %.5f %.5f ", state.pos_end(0), state.pos_end(1), state.pos_end(2));
         msg.append(state_str);
-        snprintf(state_str,2000, "(%.3f, %.3f, %.3f) | ", state.pos_end(0), state.pos_end(1), state.pos_end(2));
+        snprintf(state_str,2000, "%.5f %.5f %.5f ", state.vel_end(0), state.vel_end(1), state.vel_end(2));
         msg.append(state_str);
-        snprintf(state_str,2000, "(%.3f, %.3f, %.3f) | ", state.vel_end(0), state.vel_end(1), state.vel_end(2));
+        snprintf(state_str,2000, "%.5f %.5f %.5f ", state.bias_g(0), state.bias_g(1), state.bias_g(2));
         msg.append(state_str);
-        snprintf(state_str,2000, "(%.3f, %.3f, %.3f) | ", state.bias_g(0), state.bias_g(1), state.bias_g(2));
+        snprintf(state_str,2000, "%.5f %.5f %.5f ", state.bias_a(0), state.bias_a(1), state.bias_a(2));
         msg.append(state_str);
-        snprintf(state_str,2000, "(%.3f, %.3f, %.3f) \r\n", state.bias_a(0), state.bias_a(1), state.bias_a(2));
-        msg.append(state_str);
-        snprintf(state_str,2000, "(%.3f, %.3f, %.3f) \r\n", state.gravity(0), state.gravity(1), state.gravity(2));
+        snprintf(state_str,2000, "%.5f %.5f %.5f", state.gravity(0), state.gravity(1), state.gravity(2));
         msg.append(state_str);
         return msg;
     }

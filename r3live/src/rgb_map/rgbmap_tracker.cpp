@@ -495,7 +495,7 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
     cv::Mat deform_col  ; //= cv::Mat::zeros(new_gray.rows, new_gray.cols, CV_32F) ; 
     cv::Mat deform_row_before ;
     cv::Mat deform_col_before ;
-    cv::Mat diffrence ;
+    cv::Mat diff( new_gray.rows / 10 , new_gray.cols /10   , CV_32F)  ;
     for(int i = 0 ; i<scales.size() ; i ++)
     {
         cv::Mat curr_deform_row ; 
@@ -506,6 +506,32 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
            deform_row_before = cv::Mat::zeros( new_gray.rows / scales[i] , new_gray.cols /scales[i], CV_32F) ; 
            deform_col_before  = cv::Mat::zeros( new_gray.rows / scales[i] ,new_gray.cols /scales[i], CV_32F) ; 
             demon_scale(old_gray , new_gray , curr_deform_row , curr_deform_col ,  scales[i]  , iter[i] , kernel_size[i]  , deform_row_before  , deform_col_before ) ;
+            cv::Size new_size = cv::Size(new_gray.cols / 10 , new_gray.rows / 10 ) ; 
+            // cv::Mat new_gray10 ;
+            // cv::Mat old_gray10 ; 
+
+
+
+            // cv::resize(new_gray , new_gray10 ,new_size  , cv::INTER_LINEAR );
+            // cv::resize(old_gray , old_gray10 ,new_size  , cv::INTER_LINEAR );
+
+            // deform_row_before = deform_row_before/10 ;
+            // deform_col_before = deform_col_before/10 ; 
+
+            // for(int row = 0 ; row< new_gray10.rows ; row++ )
+            // {
+            //     for(int col = 0 ; col< new_gray10.cols ; col++ )
+            //     {
+            //         float  new_gray_value  =  get_interpulation_value(old_gray10 , row ,  col ,   7 , row +  deform_row_before.at<float>(row,col) ,col  +  deform_col_before.at<float>(row,col)   )  ;
+            //         diff.at<float>(row,col) =  std::abs(new_gray_value - new_gray10.at<float>(row,col) )*255;  
+            //     }
+
+            // }
+            // deform_row_before = deform_row_before*10;
+            // deform_col_before = deform_col_before*10 ; 
+
+
+
         }
         else 
         {
@@ -555,18 +581,23 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
          Eigen::Vector3i jet  = jetColorMap2(depth/3.0) ; 
         cv::Vec3b pixel(jet[2], jet[1], jet[0]);
 
-
+        
 
 
          
         int row = round(last_tracked_pts[i].y) ; 
         int col = round(last_tracked_pts[i].x) ; 
+        float row_translation = get_interpulation_value(deform_row , row ,  col ,   7 , last_tracked_pts[i].y ,last_tracked_pts[i].x   )  ;
+        float col_translation = get_interpulation_value(deform_col , row ,  col ,   7 , last_tracked_pts[i].y ,last_tracked_pts[i].x   )  ;
+
+
+
         old_gray_rgb.at<cv::Vec3b>(row, col) = pixel ;
-        int new_row = round(row - deform_row.at<float>(row,col) ) ; 
-        int new_col = round(col- deform_col.at<float>(row,col) ) ;
         cv::Point2f point  ; 
-        point.y = last_tracked_pts[i].y  - deform_row.at<float>(row,col) ; 
-        point.x =last_tracked_pts[i].x - deform_col.at<float>(row,col) ; 
+        point.y = last_tracked_pts[i].y  -row_translation ; 
+        point.x =last_tracked_pts[i].x - col_translation ;
+        int new_row = round(point.y ) ; 
+        int new_col = round(point.x  ) ; 
         if(new_row > new_gray_rgb.rows - 1 || new_row < 0 || new_col < 0 || new_col > new_gray_rgb.cols -1   ) 
         {
              status.push_back(0) ; 
@@ -582,9 +613,13 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
 
 
      }
+    // cv::Size blurSize(3, 3 );  // Kernel size for blurring (adjust as needed)
+    // cv::Mat blurred_diff ; 
+    // cv::boxFilter(diff , blurred_diff, -1, blurSize);
 
      //cv::imwrite("/app/images_reg/" + std::to_string(m_frame_idx) + "_1" ,old_gray_rgb ) ;
       //cv::imwrite("/app/images_reg/new" + std::to_string(m_frame_idx) + ".png" ,new_gray_rgb) ;
+      //cv::imwrite("/app/diffs/" + std::to_string(m_frame_idx) + ".png" ,blurred_diff*20) ;
       cv::imwrite("/app/images_reg/" + std::to_string(m_frame_idx) + "old.png" ,old_gray_rgb) ;
       cv::imwrite("/app/images_reg/" + std::to_string(m_frame_idx) + "new.png" ,new_gray_rgb) ;
 
@@ -674,13 +709,13 @@ void Rgbmap_tracker::track_img(std::shared_ptr<Image_frame> &img_pose, double di
 
      cv::Mat mat_F;
 
-     tim.tic( "Reject_F" );
-     unsigned int pts_before_F = m_last_tracked_pts.size();
-     mat_F = cv::findFundamentalMat( m_last_tracked_pts, m_current_tracked_pts, cv::FM_RANSAC, 1.0, 0.997, status );
-     unsigned int size_a = m_current_tracked_pts.size();
-     reduce_vector( m_last_tracked_pts, status );
-     reduce_vector( m_old_ids, status );
-     reduce_vector( m_current_tracked_pts, status );
+    //  tim.tic( "Reject_F" );
+    //  unsigned int pts_before_F = m_last_tracked_pts.size();
+    //  mat_F = cv::findFundamentalMat( m_last_tracked_pts, m_current_tracked_pts, cv::FM_RANSAC, 1.0, 0.997, status );
+    //  unsigned int size_a = m_current_tracked_pts.size();
+    //  reduce_vector( m_last_tracked_pts, status );
+    //  reduce_vector( m_old_ids, status );
+    //  reduce_vector( m_current_tracked_pts, status );
 
     m_map_rgb_pts_in_current_frame_pos.clear();
      double frame_time_diff = ( m_current_frame_time - m_last_frame_time );
@@ -704,11 +739,11 @@ void Rgbmap_tracker::track_img(std::shared_ptr<Image_frame> &img_pose, double di
 
 
 
-    cv::cvtColor(frame_gray, m_debug_track_img, cv::COLOR_GRAY2BGR);
-     for ( uint i = 0; i < m_current_tracked_pts.size(); i++ )
-     {
-         cv::arrowedLine(m_debug_track_img, m_last_tracked_pts[i], m_current_tracked_pts[i], cv::Scalar(0,0,255),3);
-     }
+    // cv::cvtColor(frame_gray, m_debug_track_img, cv::COLOR_GRAY2BGR);
+    //  for ( uint i = 0; i < m_current_tracked_pts.size(); i++ )
+    //  {
+    //      cv::arrowedLine(m_debug_track_img, m_last_tracked_pts[i], m_current_tracked_pts[i], cv::Scalar(0,0,255),3);
+    //  }
 
 
 
@@ -716,7 +751,7 @@ void Rgbmap_tracker::track_img(std::shared_ptr<Image_frame> &img_pose, double di
 
      m_old_gray = frame_gray.clone();
      m_old_frame = m_current_frame;
-   // m_map_rgb_pts_in_last_frame_pos = m_map_rgb_pts_in_current_frame_pos;
+    m_map_rgb_pts_in_last_frame_pos = m_map_rgb_pts_in_current_frame_pos;
     update_last_tracking_vector_and_ids();
     m_frame_idx++;
      m_last_frame_time = m_current_frame_time;
