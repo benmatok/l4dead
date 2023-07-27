@@ -106,7 +106,7 @@ bool R3LIVE::LIO()
         PointCloudXYZINormal::Ptr feats_down_updated(new PointCloudXYZINormal(*feats_down));
         std::vector<double> res_last(feats_down_size, 1000.0);
         std::vector<double> res_not_abs(feats_down_size, 1000.0); // initial
-
+ 
         if (featsFromMapNum >= 5)
         {
             t1 = omp_get_wtime();
@@ -378,7 +378,7 @@ bool R3LIVE::LIO()
 
 
 
-
+                 StatesGroup try_update = g_lio_state ; 
                 for( int j = 0 ; j<20 ; j++)
                 {
                     Eigen::MatrixXd Hsub(best_agree_points.size(), 6);
@@ -387,11 +387,10 @@ bool R3LIVE::LIO()
                     for (int index = 0; index < best_agree_points.size(); index++)
                     {
                         int i = best_agree_points[index];
-
                         PointType laser_p ; 
-                        pointBodyToWorld(&surface_points[i] , &laser_p   ) ; 
+                        pointBodyToWorldState(&surface_points[i] , &laser_p ,try_update  ) ; 
                         Eigen::Vector3d point_this(laser_p.x, laser_p.y, laser_p.z);
-                        point_this += g_lio_state.pos_ext_i2l;
+                        point_this += try_update.pos_ext_i2l;
                         Eigen::Matrix3d point_crossmat;
                         point_crossmat << SKEW_SYM_MATRIX(point_this);
 
@@ -400,7 +399,7 @@ bool R3LIVE::LIO()
                         Eigen::Vector3d norm_vec(norm_p.x, norm_p.y, norm_p.z);
 
                         /*** calculate the Measuremnt Jacobian matrix H ***/
-                        Eigen::Vector3d A(point_crossmat * g_lio_state.rot_end.transpose() * norm_vec);
+                        Eigen::Vector3d A(point_crossmat * try_update.rot_end.transpose() * norm_vec);
                         Hsub.row(index) << VEC_FROM_ARRAY(A), norm_p.x, norm_p.y, norm_p.z;
 
                         /*** Measuremnt: distance to the closest surface/corner ***/
@@ -418,17 +417,17 @@ bool R3LIVE::LIO()
                     {
                         cout << ANSI_COLOR_RED_BOLD << "Run EKF init" << ANSI_COLOR_RESET << endl;
                         /*** only run in initialization period ***/
-                        set_initial_state_cov(g_lio_state);
+                        set_initial_state_cov(try_update);
                     }
                     else
                     {
                         auto &&Hsub_T = Hsub.transpose();
                         H_T_H.block<6, 6>(0, 0) = Hsub_T * Hsub;
-                        Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> &&K_1 = (H_T_H + (g_lio_state.cov / LASER_POINT_COV).inverse()).inverse();
+                        Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> &&K_1 = (H_T_H + (try_update.cov / LASER_POINT_COV).inverse()).inverse();
 
                         K = K_1.block<DIM_OF_STATES, 6>(0, 0) * Hsub_T;
                         
-                        auto vec = state_propagate - g_lio_state;
+                        auto vec = state_propagate - try_update;
 
                         solution = K * (meas_vec - Hsub * vec.block<6, 1>(0, 0));
                         
@@ -436,35 +435,48 @@ bool R3LIVE::LIO()
 
                          //g_lio_state = g_lio_state.normalize_if_large(1);
 
-                         StatesGroup try_update = state_propagate + solution ;
+                         try_update = state_propagate + solution ;
                           try_update = try_update.normalize_if_large(1) ; 
+                          StatesGroup resu_states  =  StatesGroup()+ solution ; 
 
-                        vec_3 rot_resu = SO3_LOG(try_update.rot_end) * 57.3  - SO3_LOG(state_propagate.rot_end) * 57.3 ;
-                        mat_3_3 rot_cov = state_propagate.cov.block(0, 0, 3, 3) ; 
-                        double mahalanobis_distance = std::sqrt(rot_resu.transpose() *rot_cov.inverse() * rot_resu ) ; 
-                        std::ofstream outfile_mah("/app/mahalanobis_distance.txt", std::ios::app);
-                        outfile_mah <<  std::setprecision(16) << try_update.last_update_time << " "<<mahalanobis_distance << std::endl ; 
-                        outfile_mah.close() ;
-                         if(mahalanobis_distance<264)
-                         {
-                             g_lio_state = try_update ; 
 
-                         }
 
                         if(j==19)
                         {
+
 
                         // for(int iter = 0 ; iter < meas_vec.size() ; iter++)
                         // {
                         // outfile<< std::setprecision(9) << meas_vec(iter) << std::endl ; 
                         // }
-                        g_lio_state.last_update_time = Measures.lidar_end_time;
-                        euler_cur = RotMtoEuler( g_lio_state.rot_end );
-                        dump_lio_state_to_log( m_lio_state_fp );
-                         G.block<DIM_OF_STATES, 6>(0, 0) = K * Hsub;
-                        g_lio_state.cov = (I_STATE - G) * g_lio_state.cov;
-                         position_last = g_lio_state.pos_end;
-                        solve_time += omp_get_wtime() - solve_start;
+
+
+
+                        auto diff = try_update - state_propagate;
+                        StatesGroup resu_states  =  StatesGroup()+ diff ; 
+                        vec_3 rot_resu = SO3_LOG(resu_states.rot_end) ;
+                        mat_3_3 rot_cov = state_propagate.cov.block(0, 0, 3, 3) ; 
+                        double mahalanobis_distance = std::sqrt(rot_resu.transpose() *rot_cov.inverse() * rot_resu ) ; 
+                        std::ofstream outfile_mah("/app/mahalanobis_distance.txt", std::ios::app);
+                        outfile_mah <<  std::setprecision(16) << try_update.last_update_time << " "<<mahalanobis_distance << std::endl ; 
+                        outfile_mah.close() ;
+                        if(mahalanobis_distance<5)
+                        {
+                             g_lio_state = try_update ; 
+                               g_lio_state.last_update_time = Measures.lidar_end_time;
+                             euler_cur = RotMtoEuler( g_lio_state.rot_end );
+                             dump_lio_state_to_log( m_lio_state_fp );
+                             G.block<DIM_OF_STATES, 6>(0, 0) = K * Hsub;
+                            g_lio_state.cov = (I_STATE - G) * g_lio_state.cov;
+                             position_last = g_lio_state.pos_end;
+                           solve_time += omp_get_wtime() - solve_start;
+
+                        }
+
+
+
+
+
                         }
                     }
                 
@@ -828,7 +840,6 @@ void R3LIVE::single_thread()
     }
 
 }
-
 
 
 
