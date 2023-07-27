@@ -646,10 +646,7 @@ bool R3LIVE::vio_esikf(StatesGroup &state_in, Rgbmap_tracker &op_track)
 
     Eigen::Matrix<double, -1, -1> H_mat;
     Eigen::Matrix<double, -1, 1> meas_vec;
-    Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> G, H_T_H, I_STATE;
     Eigen::Matrix<double, DIM_OF_STATES, 1> solution;
-    Eigen::Matrix<double, -1, -1> K, KH;
-    Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> K_1;
 
     Eigen::SparseMatrix<double> H_mat_spa, H_T_H_spa, K_spa, KH_spa, vec_spa, I_STATE_spa;
     I_STATE.setIdentity();
@@ -813,10 +810,7 @@ bool R3LIVE::vio_photometric(StatesGroup &state_in, Rgbmap_tracker &op_track, st
     }
     Eigen::Matrix<double, -1, -1> H_mat, R_mat_inv;
     Eigen::Matrix<double, -1, 1> meas_vec;
-    Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> G, H_T_H, I_STATE;
     Eigen::Matrix<double, DIM_OF_STATES, 1> solution;
-    Eigen::Matrix<double, -1, -1> K, KH;
-    Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> K_1;
     Eigen::SparseMatrix<double> H_mat_spa, H_T_H_spa, R_mat_inv_spa, K_spa, KH_spa, vec_spa, I_STATE_spa;
     I_STATE.setIdentity();
     I_STATE_spa = I_STATE.sparseView();
