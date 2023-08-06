@@ -739,11 +739,11 @@ void Rgbmap_tracker::track_img(std::shared_ptr<Image_frame> &img_pose, double di
 
 
 
-    // cv::cvtColor(frame_gray, m_debug_track_img, cv::COLOR_GRAY2BGR);
-    //  for ( uint i = 0; i < m_current_tracked_pts.size(); i++ )
-    //  {
-    //      cv::arrowedLine(m_debug_track_img, m_last_tracked_pts[i], m_current_tracked_pts[i], cv::Scalar(0,0,255),3);
-    //  }
+    cv::cvtColor(frame_gray, m_debug_track_img, cv::COLOR_GRAY2BGR);
+     for ( uint i = 0; i < m_current_tracked_pts.size(); i++ )
+     {
+         cv::arrowedLine(m_debug_track_img, m_last_tracked_pts[i], m_current_tracked_pts[i], cv::Scalar(0,0,255),3);
+     }
 
 
 
@@ -776,13 +776,12 @@ int Rgbmap_tracker::get_all_tracked_pts(std::vector<std::vector<cv::Point2f>> *i
     return hit_count;
 }
 
-int Rgbmap_tracker::remove_outlier_using_ransac_pnp(std::shared_ptr<Image_frame> &img_pose, int if_remove_ourlier)
+int Rgbmap_tracker::remove_outlier_using_ransac_pnp(cv::Mat &r_vec, cv::Mat &t_vec , std::shared_ptr<Image_frame> &img_pose, int if_remove_ourlier)
 {
     Common_tools::Timer tim;
     tim.tic();
 
-    cv::Mat r_vec, t_vec;
-    cv::Mat R_mat;
+
     vec_3 eigen_r_vec, eigen_t_vec;
     std::vector<cv::Point3f> pt_3d_vec, pt_3d_vec_selected;
     std::vector<cv::Point2f> pt_2d_vec, pt_2d_vec_selected;

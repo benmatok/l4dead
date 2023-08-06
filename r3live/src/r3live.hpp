@@ -296,6 +296,11 @@ public:
     std::vector<std::shared_ptr<RGB_pts>> m_last_added_rgb_pts_vec;
     std::string m_map_output_dir;
     std::shared_ptr<std::shared_future<void> > m_render_thread = nullptr;
+    vec_3 last_t_vec ;
+    vec_3 last_r_vec ;
+    double last_image_time =0;
+    double last_timestamp = 0 ;
+
     
     // VIO subsystem related
     void load_vio_parameters();
@@ -335,6 +340,7 @@ public:
     H_T_H.setZero();
     I_STATE.setIdentity();
         state_lio_file.open("/app/state_lio.txt");
+
         pubLaserCloudFullRes = m_ros_node_handle.advertise<sensor_msgs::PointCloud2>("/cloud_registered", 100);
         pubLaserCloudEffect = m_ros_node_handle.advertise<sensor_msgs::PointCloud2>("/cloud_effected", 100);
         pubLaserCloudMap = m_ros_node_handle.advertise<sensor_msgs::PointCloud2>("/Laser_map", 100);

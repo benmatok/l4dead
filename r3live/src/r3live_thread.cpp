@@ -452,15 +452,16 @@ bool R3LIVE::LIO()
 
 
 
-                        auto diff = try_update - state_propagate;
-                        StatesGroup resu_states  =  StatesGroup()+ diff ; 
-                        vec_3 rot_resu = SO3_LOG(resu_states.rot_end) ;
-                        mat_3_3 rot_cov = state_propagate.cov.block(0, 0, 3, 3) ; 
-                        double mahalanobis_distance = std::sqrt(rot_resu.transpose() *rot_cov.inverse() * rot_resu ) ; 
+                       Eigen::Matrix<double, DIM_OF_STATES, 1> diff = try_update - state_propagate;
+                       // Eigen::Matrix<double, DIM_OF_STATES, 1> state_resu = resu_states - StatesGroup() ;
+
+                        //vec_3 rot_resu = SO3_LOG(resu_states.rot_end) ;
+                        //mat_3_3 rot_cov = state_propagate.cov.block(0, 0, 3, 3) ; 
+                        double mahalanobis_distance = std::sqrt(diff.transpose() *state_propagate.cov.inverse() * diff ) ; 
                         std::ofstream outfile_mah("/app/mahalanobis_distance.txt", std::ios::app);
                         outfile_mah <<  std::setprecision(16) << try_update.last_update_time << " "<<mahalanobis_distance << std::endl ; 
                         outfile_mah.close() ;
-                        if(mahalanobis_distance<5)
+                        if(mahalanobis_distance<6)
                         {
                              g_lio_state = try_update ; 
                                g_lio_state.last_update_time = Measures.lidar_end_time;
@@ -681,6 +682,11 @@ bool R3LIVE::VIO()
             op_track.init(img_pose, rgb_pts_vec, pts_2d_vec);
             g_camera_frame_idx++;
             return 1;
+            last_timestamp = img_pose->m_timestamp ; 
+            last_t_vec[0] = 0 ;
+            last_t_vec[1] = 0 ;
+            last_t_vec[2] = 0 ;
+
         }
         g_camera_frame_idx++;
 
@@ -703,13 +709,39 @@ bool R3LIVE::VIO()
          g_cost_time_logger.record(tim, "Track_img");
         // cout << "Track_img cost " << tim.toc( "Track_img" ) << endl;
          tim.tic("Ransac");
-        // set_image_pose( img_pose, state_out );
+        //set_image_pose( img_pose, state_out );
         //  ANCHOR -  remove point using PnP.
-        if (op_track.remove_outlier_using_ransac_pnp(img_pose) == 0)
+        cv::Mat r_vec ;
+        cv::Mat t_vec ;
+        vec_3 eigen_r_vec, eigen_t_vec;
+        
+        if (op_track.remove_outlier_using_ransac_pnp( r_vec, t_vec , img_pose   ) == 0)
         {
+
             cout << ANSI_COLOR_RED_BOLD << "****** Remove_outlier_using_ransac_pnp error*****" << ANSI_COLOR_RESET << endl;
         }
+        
+        else{
+            cv::cv2eigen(t_vec, eigen_t_vec);
+            cv::cv2eigen(r_vec, eigen_r_vec);
+            vec_3 delta_p = eigen_t_vec - last_t_vec ;
+            double delta_time =  img_pose->m_timestamp - last_timestamp;
+            double velocity_norm  = (delta_p *(1.0/(delta_time+1e-6))).norm() ; 
+            double state_vel_norm = state_out.vel_end.norm() ; 
+            if(velocity_norm < state_vel_norm )
+            {
+                state_out.vel_end = (velocity_norm / state_vel_norm) *state_out.vel_end ;
 
+            }
+            last_timestamp = img_pose->m_timestamp ; 
+            last_t_vec = eigen_t_vec ;
+
+            
+
+
+
+
+        }
         g_cost_time_logger.record(tim, "Ransac");
          tim.tic("Vio_f2f");
         bool res_esikf = true, res_photometric = true;
@@ -720,6 +752,18 @@ bool R3LIVE::VIO()
         res_photometric = vio_photometric(state_out, op_track, img_pose);
         g_cost_time_logger.record(tim, "Vio_f2m");
 
+
+        //auto diff = try_update - state_propagate;                
+        //StatesGroup resu_states  =  StatesGroup()+ diff ; 
+        //vec_3 rot_resu = SO3_LOG(resu_states.rot_end) ;
+        //mat_3_3 rot_cov = state_propagate.cov.block(0, 0, 3, 3) ; 
+
+        //double mahalanobis_distance = std::sqrt(rot_resu.transpose() *rot_cov.inverse() * rot_resu ) ; 
+        //std::ofstream outfile_mah("/app/mahalanobis_distance_vio                                                .txt", std::ios::app);
+        //outfile_mah <<  std::setprecision(16) << try_update.last_update_time << " "<<mahalanobis_distance << std::endl ; 
+        //outfile_mah.close() ;
+
+    
         g_lio_state = state_out;
         set_image_pose( img_pose, g_lio_state );
         print_dash_board();
