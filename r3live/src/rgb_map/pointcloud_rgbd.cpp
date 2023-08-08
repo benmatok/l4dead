@@ -225,7 +225,7 @@ void Global_map::service_refresh_pts_for_projection()
             // m_rgb_pts_in_recent_visited_voxels = pts_in_recent_hitted_boxes;
             m_mutex_rgb_pts_in_recent_hitted_boxes->unlock();
         }
-        selection_points_for_projection(img_for_projection, pts_rgb_vec_for_projection.get(), nullptr, 0.01, 1);
+        selection_points_for_projection(img_for_projection, pts_rgb_vec_for_projection.get(), nullptr, 5, 1);
         m_mutex_pts_vec->lock();
         m_pts_rgb_vec_for_projection = pts_rgb_vec_for_projection;
         m_updated_frame_index = img_for_projection->m_frame_idx;
@@ -490,7 +490,7 @@ void Global_map::render_with_a_image(std::shared_ptr<Image_frame> &img_ptr, int 
     // pts_for_render = m_rgb_pts_vec;
     if (if_select)
     {
-        selection_points_for_projection(img_ptr, &pts_for_render, nullptr, 0.01);
+        selection_points_for_projection(img_ptr, &pts_for_render, nullptr, 5);
     }
     else
     {
@@ -548,7 +548,7 @@ Eigen::Vector3i jetColorMap(double value)
 
 
 
-void Global_map::selection_points_for_projection(std::shared_ptr<Image_frame> &image_pose, std::vector<std::shared_ptr<RGB_pts>> *pc_out_vec,
+void Global_map::selection_points_for_projection(std::shared_ptr<Image_frame> &image_pose, std::vector<std::shared_ptr<RGB_pts>> *pc_out_vec,     
                                                             std::vector<cv::Point2f> *pc_2d_out_vec, double minimum_dis,
                                                             int skip_step,
                                                             int use_all_pts)
@@ -557,7 +557,7 @@ void Global_map::selection_points_for_projection(std::shared_ptr<Image_frame> &i
 
 
 
-    
+    //use_all_pts = 0 ;
     cv::Mat frame_gray = image_pose->m_img_gray;
     cv::Mat grayscale ; 
      frame_gray.convertTo(grayscale, CV_8UC1);
@@ -615,8 +615,8 @@ void Global_map::selection_points_for_projection(std::shared_ptr<Image_frame> &i
     }
     int pts_size = pts_for_projection.size();
 
-
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
+    minimum_dis = 10;
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZRGB>); 
     for (int pt_idx = 0; pt_idx < pts_size; pt_idx += skip_step)
     {
 

@@ -128,6 +128,7 @@ extern std::shared_ptr<Common_tools::ThreadPool> m_thread_pool_ptr;
 class R3LIVE
 {
 public:
+    StatesGroup last_image_state ; 
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     std::mutex  m_mutex_lio_process;
     std::shared_ptr<ImuProcess> m_imu_process;

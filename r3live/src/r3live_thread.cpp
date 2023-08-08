@@ -678,7 +678,7 @@ bool R3LIVE::VIO()
 
 
             set_image_pose(img_pose, g_lio_state); // For first frame pose, we suppose that the motion is static.
-            m_map_rgb_pts.selection_points_for_projection(img_pose, &rgb_pts_vec, &pts_2d_vec, 0.01);
+            m_map_rgb_pts.selection_points_for_projection(img_pose, &rgb_pts_vec, &pts_2d_vec, 5);
             op_track.init(img_pose, rgb_pts_vec, pts_2d_vec);
             g_camera_frame_idx++;
             return 1;
@@ -686,6 +686,7 @@ bool R3LIVE::VIO()
             last_t_vec[0] = 0 ;
             last_t_vec[1] = 0 ;
             last_t_vec[2] = 0 ;
+            last_image_state = g_lio_state ; 
 
         }
         g_camera_frame_idx++;
@@ -698,14 +699,17 @@ bool R3LIVE::VIO()
         {
             return 0 ; 
         }
+        //StatesGroup state_diff = StatesGroup() + (state_out - last_image_state) ; 
+        //Eigen::Matrix3d camera_rot = state_diff.rot_end ; 
+        Eigen::Matrix3d homography = g_cam_K*state_out.rot_end*last_image_state.rot_end.transpose()*g_cam_K.inverse() ; 
         
         
-    
+        StatesGroup state_prop =  state_out ; 
         set_image_pose(img_pose, state_out);
          //laser_to_camera(laserCloudFullRes2 ,img_pose,  g_lio_state , counter , lidar_time , outfile ); 
          //counter++ ; 
 
-        op_track.track_img(img_pose, -20);
+        op_track.track_img(img_pose, -20 ,1,homography);
          g_cost_time_logger.record(tim, "Track_img");
         // cout << "Track_img cost " << tim.toc( "Track_img" ) << endl;
          tim.tic("Ransac");
@@ -714,57 +718,71 @@ bool R3LIVE::VIO()
         cv::Mat r_vec ;
         cv::Mat t_vec ;
         vec_3 eigen_r_vec, eigen_t_vec;
-        
-        if (op_track.remove_outlier_using_ransac_pnp( r_vec, t_vec , img_pose   ) == 0)
+        auto start = std::chrono::high_resolution_clock::now();
+
+        if (op_track.remove_outlier_using_ransac_pnp( g_cam_K, r_vec, t_vec , img_pose   ) == 0)
         {
 
             cout << ANSI_COLOR_RED_BOLD << "****** Remove_outlier_using_ransac_pnp error*****" << ANSI_COLOR_RESET << endl;
         }
         
-        else{
-            cv::cv2eigen(t_vec, eigen_t_vec);
-            cv::cv2eigen(r_vec, eigen_r_vec);
-            vec_3 delta_p = eigen_t_vec - last_t_vec ;
-            double delta_time =  img_pose->m_timestamp - last_timestamp;
-            double velocity_norm  = (delta_p *(1.0/(delta_time+1e-6))).norm() ; 
-            double state_vel_norm = state_out.vel_end.norm() ; 
-            if(velocity_norm < state_vel_norm )
-            {
-                state_out.vel_end = (velocity_norm / state_vel_norm) *state_out.vel_end ;
+        auto  end = std::chrono::high_resolution_clock::now();
+        double duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
-            }
-            last_timestamp = img_pose->m_timestamp ; 
-            last_t_vec = eigen_t_vec ;
+        //std::cout << "duratiooooonnnnnnnnnnnnnn" << duration << std::endl;
+
+        // else{
+        //     cv::cv2eigen(t_vec, eigen_t_vec);
+        //     cv::cv2eigen(r_vec, eigen_r_vec);
+        //     vec_3 delta_p = eigen_t_vec - last_t_vec ;
+        //     double delta_time =  img_pose->m_timestamp - last_timestamp;
+        //     double velocity_norm  = (delta_p *(1.0/(delta_time+1e-6))).norm() ; 
+        //     double state_vel_norm = state_out.vel_end.norm() ; 
+        //     if(velocity_norm < state_vel_norm )
+        //     {
+        //         state_out.vel_end = (velocity_norm / state_vel_norm) *state_out.vel_end ;
+
+        //     }
+        //     last_timestamp = img_pose->m_timestamp ; 
+        //     last_t_vec = eigen_t_vec ;
 
             
 
 
 
 
-        }
+        // }
         g_cost_time_logger.record(tim, "Ransac");
          tim.tic("Vio_f2f");
         bool res_esikf = true, res_photometric = true;
         wait_render_thread_finish();
         res_esikf = vio_esikf(state_out, op_track);
+
+        // std::ofstream outfile_mah("/app/debug.txt", std::ios::app);
+        // outfile_mah <<  <<res_esikf << std::endl ; 
+        // outfile_mah.close() ;
         g_cost_time_logger.record(tim, "Vio_f2f");
         tim.tic("Vio_f2m");
-        res_photometric = vio_photometric(state_out, op_track, img_pose);
+        //res_photometric = vio_photometric(state_out, op_track, img_pose);
         g_cost_time_logger.record(tim, "Vio_f2m");
 
+                           
+        Eigen::Matrix<double, DIM_OF_STATES, 1> diff = state_out - state_prop;
+      double mahalanobis_distance = std::sqrt(diff.transpose() *state_prop.cov.inverse() * diff ) ; 
+                        
+        std::ofstream outfile_mah("/app/mahalanobis_distance_vio.txt", std::ios::app);
+        outfile_mah <<  std::setprecision(16) << state_out.last_update_time << " "<<mahalanobis_distance << std::endl ; 
+            outfile_mah.close() ;
 
-        //auto diff = try_update - state_propagate;                
-        //StatesGroup resu_states  =  StatesGroup()+ diff ; 
-        //vec_3 rot_resu = SO3_LOG(resu_states.rot_end) ;
-        //mat_3_3 rot_cov = state_propagate.cov.block(0, 0, 3, 3) ; 
-
-        //double mahalanobis_distance = std::sqrt(rot_resu.transpose() *rot_cov.inverse() * rot_resu ) ; 
-        //std::ofstream outfile_mah("/app/mahalanobis_distance_vio                                                .txt", std::ios::app);
-        //outfile_mah <<  std::setprecision(16) << try_update.last_update_time << " "<<mahalanobis_distance << std::endl ; 
-        //outfile_mah.close() ;
-
-    
+        if(mahalanobis_distance< 3)
+        {
         g_lio_state = state_out;
+        }
+        else {
+            g_lio_state = state_prop ;
+
+        }
+        last_image_state = g_lio_state ; 
         set_image_pose( img_pose, g_lio_state );
         print_dash_board();
 
@@ -842,6 +860,16 @@ void R3LIVE::single_thread()
     cv::imshow( "Control panel", generate_control_panel_img().clone() );
     std::ofstream outfile_vec ;
     outfile_vec.open("/app/mahalanobis_distance.txt");
+    outfile_vec.close() ; 
+
+
+    outfile_vec.open("/app/mahalanobis_distance_vio.txt");
+    outfile_vec.close() ; 
+
+
+
+
+    outfile_vec.open("/app/debug.txt");
     outfile_vec.close() ; 
 
 

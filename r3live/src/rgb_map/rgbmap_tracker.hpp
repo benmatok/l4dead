@@ -111,6 +111,7 @@ class Rgbmap_tracker
         m_old_ids.clear();
         for ( auto it = m_map_rgb_pts_in_last_frame_pos.begin(); it != m_map_rgb_pts_in_last_frame_pos.end(); it++ )
         {
+            
             m_rgb_pts_ptr_vec_in_last_frame.push_back( it->first );
             m_last_tracked_pts.push_back( it->second );
             m_colors.push_back( ( ( RGB_pts * ) it->first )->m_dbg_color );
@@ -171,10 +172,10 @@ class Rgbmap_tracker
         v.resize( j );
     }
 
-    void track_img( std::shared_ptr< Image_frame > &img_pose, double dis = 2.0, int if_use_opencv = 1 );
+    void track_img( std::shared_ptr< Image_frame > &img_pose, double dis = 2.0, int if_use_opencv = 1 , Eigen::Matrix3d homography =  Eigen::Matrix3d::Identity() );
     int get_all_tracked_pts( std::vector< std::vector< cv::Point2f > > *img_pt_vec = nullptr );
-    int remove_outlier_using_ransac_pnp( cv::Mat &r_vec, cv::Mat &t_vec  , std::shared_ptr< Image_frame > &img_pose, int if_remove_ourlier = 1 );
-    void demon_track_image( cv::Mat &curr_img, const std::vector<cv::Point2f> &last_tracked_pts,std::vector<cv::Point2f> &curr_tracked_pts, std::vector<uchar> &status, std::shared_ptr<Image_frame> &img_pose)  ;
+    int remove_outlier_using_ransac_pnp(Eigen::Matrix3d &cam_K , cv::Mat &r_vec, cv::Mat &t_vec  , std::shared_ptr< Image_frame > &img_pose, int if_remove_ourlier = 1 );
+    void demon_track_image( cv::Mat &curr_img, const std::vector<cv::Point2f> &last_tracked_pts,std::vector<cv::Point2f> &curr_tracked_pts, std::vector<uchar> &status, std::shared_ptr<Image_frame> &img_pose, Eigen::Matrix3d homography)  ;
 
 
 

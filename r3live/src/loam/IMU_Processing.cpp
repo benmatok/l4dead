@@ -263,8 +263,8 @@ StatesGroup ImuProcess::imu_preintegration( const StatesGroup &state_in, std::de
         acc_imu = R_imu * acc_avr - state_inout.gravity;
         pos_imu = pos_imu + vel_imu * dt + 0.5 * acc_imu * dt * dt;
         vel_imu = vel_imu + acc_imu * dt;
-        angvel_last = angvel_avr;
-        acc_s_last = acc_imu;
+        //angvel_last = angvel_avr;
+        //acc_s_last = acc_imu;
 
         // cout <<  std::setprecision(3) << " dt = " << dt << ", acc: " << acc_avr.transpose()
         //      << " acc_imu: " << acc_imu.transpose()

@@ -65,7 +65,7 @@ void Rgbmap_tracker::update_and_append_track_pts(std::shared_ptr<Image_frame> &i
     tim.tic();
     double u_d, v_d;
     int u_i, v_i;
-    double max_allow_repro_err =   2.0 * img_pose->m_img_cols / 320.0;
+    double max_allow_repro_err = 2.0 * img_pose->m_img_cols / 320.0;
     Hash_map_2d<int, float> map_2d_pts_occupied;
 
     for (auto it = m_map_rgb_pts_in_last_frame_pos.begin(); it != m_map_rgb_pts_in_last_frame_pos.end();)
@@ -152,10 +152,10 @@ void Rgbmap_tracker::update_and_append_track_pts(std::shared_ptr<Image_frame> &i
                     new_added_pts++;
                 }
             }
-       if (m_map_rgb_pts_in_last_frame_pos.size() >= m_maximum_vio_tracked_pts)
-        {
-            break;
-        }
+            if (m_map_rgb_pts_in_last_frame_pos.size() >= m_maximum_vio_tracked_pts)
+            {
+                break;
+            }
             new_add_pt++;
         }
         // cout << "Tracker new added pts = " << new_added_pts << " |  " << map_rgb.m_pts_rgb_vec_for_projection->size()
@@ -230,7 +230,6 @@ void Rgbmap_tracker::reject_error_tracking_pts(std::shared_ptr<Image_frame> &img
 //     return hist_equalized_image;
 // }
 
-
 struct Point
 {
     double x;
@@ -238,175 +237,109 @@ struct Point
     double z;
 };
 
-
-float get_interpulation_value(cv::Mat &image , int row , int col ,int kernel_size , float x , float y   ) 
+float get_interpulation_value(cv::Mat &image, int row, int col, int kernel_size, float x, float y)
 {
-    
 
-
-
-    if(x >= image.rows  -2 ||  y <= 0 || x <= 0  || y >=image.cols  -2 )
+    if (x >= image.rows - 2 || y <= 0 || x <= 0 || y >= image.cols - 2)
     {
-        return image.at<float>(row,col) ; 
-
+        return image.at<float>(row, col);
     }
 
+    int rows = image.rows;
+    int cols = image.cols;
 
+    int p1_x = floor(x);
+    int p1_y = floor(y);
+    float p1_z = image.at<float>(p1_x, p1_y);
 
+    int p2_x = ceil(x + 1);
+    int p2_y = floor(y);
+    float p2_z = image.at<float>(p2_x, p2_y);
 
-    int rows = image.rows ; 
-    int cols = image.cols ; 
+    int p3_y = ceil(y + 1);
+    int p3_x = floor(x);
+    float p3_z = image.at<float>(p3_x, p3_y);
 
-    int p1_x =  floor(x ) ; 
-    int p1_y =  floor(y ) ; 
-    float p1_z  =  image.at<float>(p1_x,p1_y) ; 
+    int p4_y = ceil(y + 1);
+    int p4_x = ceil(x + 1);
 
-
-
-    int p2_x =  ceil(x+1 ) ; 
-    int p2_y =   floor(y ) ; 
-    float p2_z  =  image.at<float>(p2_x,p2_y) ;
-
-
-    int p3_y =  ceil(y+1 ) ; 
-    int p3_x =   floor(x ) ; 
-    float p3_z  =  image.at<float>(p3_x,p3_y) ;
-
-    int p4_y =  ceil(y+1 ) ; 
-    int p4_x =   ceil(x+1 ) ; 
-
-     float p4_z  =  image.at<float>(p4_x,p4_y) ;
-
-
+    float p4_z = image.at<float>(p4_x, p4_y);
 
     // Check if the sample points lie on a horizontal line
-    
+
     float z1 = p1_z + (x - p1_x) / (p2_x - p1_x) * (p2_z - p1_z);
     float z2 = p3_z + (x - p3_x) / (p4_x - p3_x) * (p4_z - p3_z);
-    
-
 
     float value = z1 + (y - p1_y) / (p3_y - p1_y) * (z2 - z1);
 
     return value;
-
-
-
-    
-
- 
-
-
-
 }
 
-
-
-
-
-void Rgbmap_tracker::register_images(cv::Mat &new_gray , cv::Mat &old_gray  , cv::Mat &deform_row , cv::Mat &deform_col  , int num_iter , int kernel_size)
+void Rgbmap_tracker::register_images(cv::Mat &new_gray, cv::Mat &old_gray, cv::Mat &deform_row, cv::Mat &deform_col, int num_iter, int kernel_size)
 {
-   // PROFC_NODE("register_images");
+    // PROFC_NODE("register_images");
 
-    cv::Mat x_kernel =  (cv::Mat_<float>(1, 3) << -0.5f, 0.0f, 0.5f);
-    cv::Mat  grad_x_old ;  
-    cv::filter2D(old_gray, grad_x_old, -1, x_kernel); 
-    cv::Mat grad_y_old  ;
-    cv::filter2D(old_gray, grad_y_old, -1, x_kernel.t() );
-
+    cv::Mat x_kernel = (cv::Mat_<float>(1, 3) << -0.5f, 0.0f, 0.5f);
+    cv::Mat grad_x_old;
+    cv::filter2D(old_gray, grad_x_old, -1, x_kernel);
+    cv::Mat grad_y_old;
+    cv::filter2D(old_gray, grad_y_old, -1, x_kernel.t());
 
     for (int iter = 0; iter < num_iter; iter++)
-    {   
+    {
         for (int i = 0; i < new_gray.rows; i++)
         {
             for (int j = 0; j < new_gray.cols; j++)
             {
-                 
-                
 
-                
-
-                float  new_gray_value  = get_interpulation_value(new_gray , i ,  j ,   7 , i +  deform_row.at<float>(i,j) ,j +  deform_col.at<float>(i,j)   )  ;
+                float new_gray_value = get_interpulation_value(new_gray, i, j, 7, i + deform_row.at<float>(i, j), j + deform_col.at<float>(i, j));
                 float grad_x = grad_x_old.at<float>(i, j);
                 float grad_y = grad_y_old.at<float>(i, j);
 
-        
                 float i_minus_jt = old_gray.at<float>(i, j) - new_gray_value;
                 float grad_norm_2 = grad_x * grad_x + grad_y * grad_y;
-                float alpha = 1 ;
+                float alpha = 1;
 
-                float temp_factor = i_minus_jt/(grad_norm_2 + i_minus_jt * i_minus_jt + 1e-4);
-                float v_row =  grad_y * temp_factor;
-                float v_col =  grad_x * temp_factor;
+                float temp_factor = i_minus_jt / (grad_norm_2 + i_minus_jt * i_minus_jt + 1e-4);
+                float v_row = grad_y * temp_factor;
+                float v_col = grad_x * temp_factor;
 
-                deform_row.at<float>(i,j) += v_row ;
-                deform_col.at<float>(i,j) += v_col ;
-                
-
+                deform_row.at<float>(i, j) += v_row;
+                deform_col.at<float>(i, j) += v_col;
             }
         }
 
-        cv::Size blurSize(kernel_size, kernel_size );  // Kernel size for blurring (adjust as needed)
-        cv::Mat blurred_deform_row ; 
-        cv::Mat blurred_deform_col ; 
+        cv::Size blurSize(kernel_size, kernel_size); // Kernel size for blurring (adjust as needed)
+        cv::Mat blurred_deform_row;
+        cv::Mat blurred_deform_col;
         cv::boxFilter(deform_row, blurred_deform_row, -1, blurSize);
         cv::boxFilter(deform_col, blurred_deform_col, -1, blurSize);
         blurred_deform_row.copyTo(deform_row);
         blurred_deform_col.copyTo(deform_col);
-
-
-        
     }
-
-
 }
 
-
-
-
-
-
-void Rgbmap_tracker::demon_scale(cv::Mat &new_gray , cv::Mat &old_gray , cv::Mat &deform_row , cv::Mat &deform_col ,  int scale  , int iter , int kernel_size , cv::Mat &deform_row_before , cv::Mat &deform_col_before )  
+void Rgbmap_tracker::demon_scale(cv::Mat &new_gray, cv::Mat &old_gray, cv::Mat &deform_row, cv::Mat &deform_col, int scale, int iter, int kernel_size, cv::Mat &deform_row_before, cv::Mat &deform_col_before)
 {
-    //PROFC_NODE("demon_scale");
-    cv::Size new_size = cv::Size(new_gray.cols / scale, new_gray.rows / scale ) ; 
-    cv::Size old_size = cv::Size(new_gray.cols , new_gray.rows  ) ; 
-    cv::Mat new_gray_scale ;
-    cv::Mat old_gray_scale ;
-    deform_row_before = deform_row_before  / scale ; 
-    deform_col_before = deform_col_before  / scale ; 
+    // PROFC_NODE("demon_scale");
+    cv::Size new_size = cv::Size(new_gray.cols / scale, new_gray.rows / scale);
+    cv::Size old_size = cv::Size(new_gray.cols, new_gray.rows);
+    cv::Mat new_gray_scale;
+    cv::Mat old_gray_scale;
+    deform_row_before = deform_row_before / scale;
+    deform_col_before = deform_col_before / scale;
 
+    cv::resize(new_gray, new_gray_scale, new_size, cv::INTER_LINEAR);
+    cv::resize(old_gray, old_gray_scale, new_size, cv::INTER_LINEAR);
 
-    cv::resize(new_gray, new_gray_scale,new_size  , cv::INTER_LINEAR );
-    cv::resize(old_gray, old_gray_scale,new_size  , cv::INTER_LINEAR );
-
-     //cv::Mat deform_row_scale ; // = cv::Mat::zeros(old_gray_scale.rows, old_gray_scale.cols, CV_32F)  ;
-    //cv::Mat deform_col_scale ;//=  cv::Mat::zeros(old_gray_scale.rows, old_gray_scale.cols, CV_32F)  ;  ;
-     cv::resize(deform_row_before, deform_row,new_size  , cv::INTER_LINEAR );
-     cv::resize(deform_col_before, deform_col,new_size  , cv::INTER_LINEAR );
-     register_images(new_gray_scale , old_gray_scale  , deform_row , deform_col  , iter , kernel_size ) ;
-    deform_row = deform_row*scale ; 
-    deform_col = deform_col*scale ; 
-
-
-
-
+    // cv::Mat deform_row_scale ; // = cv::Mat::zeros(old_gray_scale.rows, old_gray_scale.cols, CV_32F)  ;
+    // cv::Mat deform_col_scale ;//=  cv::Mat::zeros(old_gray_scale.rows, old_gray_scale.cols, CV_32F)  ;  ;
+    cv::resize(deform_row_before, deform_row, new_size, cv::INTER_LINEAR);
+    cv::resize(deform_col_before, deform_col, new_size, cv::INTER_LINEAR);
+    register_images(new_gray_scale, old_gray_scale, deform_row, deform_col, iter, kernel_size);
+    deform_row = deform_row * scale;
+    deform_col = deform_col * scale;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 Eigen::Vector3i jetColorMap2(double value)
 {
@@ -453,185 +386,175 @@ Eigen::Vector3i jetColorMap2(double value)
     return Eigen::Vector3i(red, green, blue);
 }
 
-
-
-
-
-
-
-
-void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::Point2f> &last_tracked_pts, std::vector<cv::Point2f> &curr_tracked_pts, std::vector<uchar> &status ,std::shared_ptr<Image_frame> &img_pose )
+void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::Point2f> &last_tracked_pts, std::vector<cv::Point2f> &curr_tracked_pts, std::vector<uchar> &status, std::shared_ptr<Image_frame> &img_pose , Eigen::Matrix3d homography)
 {
 
-
-
-
-
-
-
- 
-
-
-
-
-
-    cv::Mat new_gray ;
-    cv::Mat old_gray ;
+    cv::Mat new_gray;
+    cv::Mat old_gray;
     m_old_gray.convertTo(old_gray, CV_32F);
     curr_img.convertTo(new_gray, CV_32F);
 
-    old_gray = old_gray/255 ;
-    new_gray = new_gray/255 ; 
-    
+    old_gray = old_gray / 255;
+    new_gray = new_gray / 255;
 
-    cv::Mat original_new_gray ; 
+    cv::Mat original_new_gray;
     new_gray.copyTo(original_new_gray);
-
-    std::vector<int> scales = {10 ,9 , 7 , 5 , 3 ,1 };
-    std::vector<int> iter = {20,20 , 20,20 , 0 , 0 }  ;
-    std::vector<int> kernel_size = {5,5 , 5,5 , 0 , 0 } ;
-    
-    cv::Mat deform_row  ; // = cv::Mat::zeros(new_gray.rows, new_gray.cols, CV_32F) ; 
-    cv::Mat deform_col  ; //= cv::Mat::zeros(new_gray.rows, new_gray.cols, CV_32F) ; 
-    cv::Mat deform_row_before ;
-    cv::Mat deform_col_before ;
-    cv::Mat diff( new_gray.rows / 10 , new_gray.cols /10   , CV_32F)  ;
-    for(int i = 0 ; i<scales.size() ; i ++)
+    cv::Mat initial_deform_row(new_gray.rows , new_gray.cols , CV_32F);
+    cv::Mat initial_deform_col(new_gray.rows , new_gray.cols , CV_32F);
+    // Initialization with homography
+    std::cout << homography << std::endl;
+    for (int i =0 ; i<new_gray.rows ; i++ )
     {
-        cv::Mat curr_deform_row ; 
-        cv::Mat curr_deform_col ; 
-        if(i==0)
-        {
+
         
-           deform_row_before = cv::Mat::zeros( new_gray.rows / scales[i] , new_gray.cols /scales[i], CV_32F) ; 
-           deform_col_before  = cv::Mat::zeros( new_gray.rows / scales[i] ,new_gray.cols /scales[i], CV_32F) ; 
-            demon_scale(old_gray , new_gray , curr_deform_row , curr_deform_col ,  scales[i]  , iter[i] , kernel_size[i]  , deform_row_before  , deform_col_before ) ;
-            cv::Size new_size = cv::Size(new_gray.cols / 10 , new_gray.rows / 10 ) ; 
-            // cv::Mat new_gray10 ;
-            // cv::Mat old_gray10 ; 
-
-
-
-            // cv::resize(new_gray , new_gray10 ,new_size  , cv::INTER_LINEAR );
-            // cv::resize(old_gray , old_gray10 ,new_size  , cv::INTER_LINEAR );
-
-            // deform_row_before = deform_row_before/10 ;
-            // deform_col_before = deform_col_before/10 ; 
-
-            // for(int row = 0 ; row< new_gray10.rows ; row++ )
-            // {
-            //     for(int col = 0 ; col< new_gray10.cols ; col++ )
-            //     {
-            //         float  new_gray_value  =  get_interpulation_value(old_gray10 , row ,  col ,   7 , row +  deform_row_before.at<float>(row,col) ,col  +  deform_col_before.at<float>(row,col)   )  ;
-            //         diff.at<float>(row,col) =  std::abs(new_gray_value - new_gray10.at<float>(row,col) )*255;  
-            //     }
-
-            // }
-            // deform_row_before = deform_row_before*10;
-            // deform_col_before = deform_col_before*10 ; 
-
-
-
-        }
-        else 
+      for (int j =0 ; j<new_gray.cols ; j++ )
         {
+            Eigen::Vector3d pixel_1(j,i,1) ; 
+            Eigen::Vector3d pixel_2 = homography *pixel_1  ; 
+            initial_deform_row.at<float>(i,j) =  pixel_2[1] - i  ; 
+            initial_deform_col.at<float>(i,j) =  pixel_2[0]  - j ; 
 
-            demon_scale(old_gray , new_gray , curr_deform_row , curr_deform_col ,  scales[i]  , iter[i] , kernel_size[i]  , deform_row_before  , deform_col_before ) ;
-        }
-        curr_deform_row.copyTo(deform_row_before) ;
-        curr_deform_col.copyTo(deform_col_before) ;
+
+
         
+        }
+
+    }
+
+
+
+
+    std::vector<int> scales = {10, 9, 7, 5, 3, 1};
+    std::vector<int> iter = {20, 20, 20, 20, 0, 0};
+    std::vector<int> kernel_size = {5, 5, 5, 5, 0, 0};
+
+    cv::Mat deform_row; // = cv::Mat::zeros(new_gray.rows, new_gray.cols, CV_32F) ;
+    cv::Mat deform_col; //= cv::Mat::zeros(new_gray.rows, new_gray.cols, CV_32F) ;
+    cv::Mat deform_row_before;
+    cv::Mat deform_col_before;
+      cv::Size new_size = cv::Size(new_gray.cols / 10, new_gray.rows / 10);
+    cv::resize(initial_deform_row, deform_row_before, new_size, cv::INTER_LINEAR);
+    cv::resize(initial_deform_col, deform_col_before, new_size, cv::INTER_LINEAR);
+
+    cv::Mat diff(new_gray.rows / 10, new_gray.cols / 10, CV_32F);
+    for (int i = 0; i < scales.size(); i++)
+    {
+        cv::Mat curr_deform_row;
+        cv::Mat curr_deform_col;
+        // if (i == 0)
+        // {
+            
+        //     //deform_row_before = cv::Mat::zeros(new_gray.rows / scales[i], new_gray.cols / scales[i], CV_32F);
+        //     //deform_col_before = cv::Mat::zeros(new_gray.rows / scales[i], new_gray.cols / scales[i], CV_32F);
+        //     demon_scale(old_gray, new_gray, curr_deform_row, curr_deform_col, scales[i], iter[i], kernel_size[i], deform_row_before, deform_col_before);
+        //     cv::Size new_size = cv::Size(new_gray.cols / 10, new_gray.rows / 10);
+        // }
+       // else
+       // {
+
+            demon_scale(old_gray, new_gray, curr_deform_row, curr_deform_col, scales[i], iter[i], kernel_size[i], deform_row_before, deform_col_before);
+        //}
+        curr_deform_row.copyTo(deform_row_before);
+        curr_deform_col.copyTo(deform_col_before);
+    }
+    deform_row = deform_row_before;
+    deform_col = deform_col_before;
+
+    curr_tracked_pts.clear();
+    cv::Mat grayscale;
+    new_gray.convertTo(grayscale, CV_8UC1, 255.0);
+    cv::Mat new_gray_rgb(new_gray.size(), CV_8UC3);
+    cv::cvtColor(grayscale, new_gray_rgb, cv::COLOR_GRAY2RGB);
+
+    cv::Mat grayscale1;
+    old_gray.convertTo(grayscale1, CV_8UC1, 255.0);
+    cv::Mat old_gray_rgb(new_gray.size(), CV_8UC3);
+    cv::cvtColor(grayscale1, old_gray_rgb, cv::COLOR_GRAY2RGB);
+    
+    cv::Mat inital_image ; 
+    new_gray_rgb.copyTo(inital_image); ;
+
+    // cv::Mat old_gray_rgb(old_gray.size(), CV_8UC3) ;
+    // cv::cvtColor(old_gray*255, new_gray_rgb, cv::COLOR_GRAY2RGB);
+    // std::cout <<last_tracked_pts.size() -m_rgb_pts_ptr_vec_in_last_frame.size() << std::endl;
+    for (int i = 0; i < last_tracked_pts.size(); i++)
+    {
+
+        RGB_pts *rgb_pts_ptr = ((RGB_pts *)m_rgb_pts_ptr_vec_in_last_frame[m_old_ids[i]]);
+        double depth = (rgb_pts_ptr->get_pos() - img_pose->m_pose_w2c_t).norm();
+        Eigen::Vector3i jet = jetColorMap2(depth / 3.0);
+        cv::Vec3b pixel(jet[2], jet[1], jet[0]);
+
+        int row = round(last_tracked_pts[i].y);
+        int col = round(last_tracked_pts[i].x);
+        float row_translation = get_interpulation_value(deform_row, row, col, 7, last_tracked_pts[i].y, last_tracked_pts[i].x);
+        float col_translation = get_interpulation_value(deform_col, row, col, 7, last_tracked_pts[i].y, last_tracked_pts[i].x);
+
+        old_gray_rgb.at<cv::Vec3b>(row, col) = pixel;
+        cv::Point2f point;
+        point.y = last_tracked_pts[i].y - row_translation;
+        point.x = last_tracked_pts[i].x - col_translation;
+        int new_row = round(point.y);
+        int new_col = round(point.x);
+        if (new_row > new_gray_rgb.rows - 1 || new_row < 0 || new_col < 0 || new_col > new_gray_rgb.cols - 1)
+        {
+            status.push_back(0);
+            curr_tracked_pts.push_back(point);
+            continue;
+        }
+        new_gray_rgb.at<cv::Vec3b>(new_row, new_col) = pixel;
+
+        status.push_back(1);
+        curr_tracked_pts.push_back(point);
+    
+        row_translation = get_interpulation_value(initial_deform_row, row, col, 7, last_tracked_pts[i].y, last_tracked_pts[i].x);
+        col_translation = get_interpulation_value(initial_deform_col, row, col, 7, last_tracked_pts[i].y, last_tracked_pts[i].x);
+
+
+        point.y = last_tracked_pts[i].y - row_translation;
+        point.x = last_tracked_pts[i].x - col_translation;
+        new_row = round(point.y);
+        new_col = round(point.x);
+        if (new_row > new_gray_rgb.rows - 1 || new_row < 0 || new_col < 0 || new_col > new_gray_rgb.cols - 1)
+        {
+            continue;
+        }
+        inital_image.at<cv::Vec3b>(new_row, new_col) = pixel;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
     }
-    deform_row = deform_row_before ; 
-    deform_col = deform_col_before ; 
-
-
-
-
-
-    
-     curr_tracked_pts.clear()  ;
-     cv::Mat grayscale ; 
-        new_gray.convertTo(grayscale, CV_8UC1, 255.0);
-       cv::Mat new_gray_rgb(new_gray.size(), CV_8UC3) ; 
-       cv::cvtColor(grayscale, new_gray_rgb, cv::COLOR_GRAY2RGB);
-
-
-
-
-
-       cv::Mat grayscale1 ; 
-        old_gray.convertTo(grayscale1, CV_8UC1, 255.0);
-       cv::Mat old_gray_rgb(new_gray.size(), CV_8UC3) ; 
-       cv::cvtColor(grayscale1, old_gray_rgb, cv::COLOR_GRAY2RGB);
-
-
-      //cv::Mat old_gray_rgb(old_gray.size(), CV_8UC3) ; 
-      //cv::cvtColor(old_gray*255, new_gray_rgb, cv::COLOR_GRAY2RGB);
-    //std::cout <<last_tracked_pts.size() -m_rgb_pts_ptr_vec_in_last_frame.size() << std::endl;
-     for(int i = 0 ; i<last_tracked_pts.size() ; i++ )
-     {
-        
-
-          RGB_pts *rgb_pts_ptr = ( ( RGB_pts * ) m_rgb_pts_ptr_vec_in_last_frame[ m_old_ids[ i ] ] );
-          double depth = (rgb_pts_ptr->get_pos() -  img_pose->m_pose_w2c_t ).norm() ; 
-         Eigen::Vector3i jet  = jetColorMap2(depth/3.0) ; 
-        cv::Vec3b pixel(jet[2], jet[1], jet[0]);
-
-        
-
-
-         
-        int row = round(last_tracked_pts[i].y) ; 
-        int col = round(last_tracked_pts[i].x) ; 
-        float row_translation = get_interpulation_value(deform_row , row ,  col ,   7 , last_tracked_pts[i].y ,last_tracked_pts[i].x   )  ;
-        float col_translation = get_interpulation_value(deform_col , row ,  col ,   7 , last_tracked_pts[i].y ,last_tracked_pts[i].x   )  ;
-
-
-
-        old_gray_rgb.at<cv::Vec3b>(row, col) = pixel ;
-        cv::Point2f point  ; 
-        point.y = last_tracked_pts[i].y  -row_translation ; 
-        point.x =last_tracked_pts[i].x - col_translation ;
-        int new_row = round(point.y ) ; 
-        int new_col = round(point.x  ) ; 
-        if(new_row > new_gray_rgb.rows - 1 || new_row < 0 || new_col < 0 || new_col > new_gray_rgb.cols -1   ) 
-        {
-             status.push_back(0) ; 
-             curr_tracked_pts.push_back(point ) ;
-            continue ; 
-        }
-        new_gray_rgb.at<cv::Vec3b>(new_row, new_col) = pixel ;
-
-        status.push_back(1) ; 
-        curr_tracked_pts.push_back(point ) ;
-
-
-
-
-     }
     // cv::Size blurSize(3, 3 );  // Kernel size for blurring (adjust as needed)
-    // cv::Mat blurred_diff ; 
+    // cv::Mat blurred_diff ;
     // cv::boxFilter(diff , blurred_diff, -1, blurSize);
 
-     //cv::imwrite("/app/images_reg/" + std::to_string(m_frame_idx) + "_1" ,old_gray_rgb ) ;
-      //cv::imwrite("/app/images_reg/new" + std::to_string(m_frame_idx) + ".png" ,new_gray_rgb) ;
-      //cv::imwrite("/app/diffs/" + std::to_string(m_frame_idx) + ".png" ,blurred_diff*20) ;
-      cv::imwrite("/app/images_reg/" + std::to_string(m_frame_idx) + "old.png" ,old_gray_rgb) ;
-      cv::imwrite("/app/images_reg/" + std::to_string(m_frame_idx) + "new.png" ,new_gray_rgb) ;
+    // cv::imwrite("/app/images_reg/" + std::to_string(m_frame_idx) + "_1" ,old_gray_rgb ) ;
+    // cv::imwrite("/app/images_reg/new" + std::to_string(m_frame_idx) + ".png" ,new_gray_rgb) ;
+    // cv::imwrite("/app/diffs/" + std::to_string(m_frame_idx) + ".png" ,blurred_diff*20) ;
+    cv::imwrite("/app/images_reg/" + std::to_string(m_frame_idx) + "old.png", old_gray_rgb);
+    cv::imwrite("/app/images_reg/" + std::to_string(m_frame_idx) + "new.png", new_gray_rgb);
+    cv::imwrite("/app/images_reg/" + std::to_string(m_frame_idx) + "initial.png", inital_image);
 
 
-
-     //outfile.close() ; 
-      //auto endTime = std::chrono::high_resolution_clock::now();
-    //auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
-     //std::cout << "Execution time: " << duration << " milliseconds" << std::endl;
-
-
-
+    // outfile.close() ;
+    // auto endTime = std::chrono::high_resolution_clock::now();
+    // auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
+    // std::cout << "Execution time: " << duration << " milliseconds" << std::endl;
 
     // cv::Mat after_solution(new_gray.rows, new_gray.cols, CV_32F) ;  //(new_gray.rows, new_gray.cols, CV_32F, cv::Scalar(0));
     // for (int i = 0; i < after_solution.rows; i++)
@@ -639,41 +562,26 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
     //      for (int j = 0; j < after_solution.cols; j++)
     //     {
 
-            
     //         //float  new_gray_value  =  get_interpulation_value(old_gray , i ,  j ,   7 , i +  deform_row.at<float>(i,j) ,j +  deform_col.at<float>(i,j)   )  ;
-    //         int new_row = round(i - deform_row.at<float>(i,j)) ; 
-    //         int new_col =  round(j  - deform_col.at<float>(i,j)) ; 
-    //          if(new_row > new_gray_rgb.rows - 1 || new_row < 0 || new_col < 0 || new_col > new_gray_rgb.cols -1   ) 
+    //         int new_row = round(i - deform_row.at<float>(i,j)) ;
+    //         int new_col =  round(j  - deform_col.at<float>(i,j)) ;
+    //          if(new_row > new_gray_rgb.rows - 1 || new_row < 0 || new_col < 0 || new_col > new_gray_rgb.cols -1   )
     //         {
-    //             continue ; 
+    //             continue ;
     //         }
     //         after_solution.at<float>(new_row,new_col ) = old_gray.at<float>(i,j) ;
     //     }
 
-
     //  }
-
-
-
-
-
-
 
     //  cv::imwrite("/app/images/" + std::to_string(m_frame_idx) + "before_reg.png" ,255*old_gray ) ;
     //  cv::imwrite("/app/images/" + std::to_string(m_frame_idx) + "after_reg.png" ,255*after_solution ) ;
     //  cv::imwrite("/app/images/" + std::to_string(m_frame_idx) +"to_reg.png" ,255*new_gray ) ;
-
-
-
-
-
-
-
-    
 }
 
-void Rgbmap_tracker::track_img(std::shared_ptr<Image_frame> &img_pose, double dis, int if_use_opencv)
+void Rgbmap_tracker::track_img(std::shared_ptr<Image_frame> &img_pose, double dis, int if_use_opencv,Eigen::Matrix3d homography )
 {
+
     Common_tools::Timer tim;
     m_current_frame = img_pose->m_img;
     m_current_frame_time = img_pose->m_timestamp;
@@ -695,19 +603,16 @@ void Rgbmap_tracker::track_img(std::shared_ptr<Image_frame> &img_pose, double di
 
     // m_lk_optical_flow_kernel->track_image( frame_gray, m_last_tracked_pts, m_current_tracked_pts, status, 2 );
     // track_image(m_old_gray , frame_gray, m_last_tracked_pts, m_current_tracked_pts, status, 2 );
-    //std::cout << m_last_tracked_pts.size() << std::endl;
-     demon_track_image(frame_gray, m_last_tracked_pts, m_current_tracked_pts, status, img_pose);
+    // std::cout << m_last_tracked_pts.size() << std::endl;
+    demon_track_image(frame_gray, m_last_tracked_pts, m_current_tracked_pts, status, img_pose ,homography);
 
+    reduce_vector(m_last_tracked_pts, status);
+    reduce_vector(m_old_ids, status);
+    reduce_vector(m_current_tracked_pts, status);
 
-      reduce_vector( m_last_tracked_pts, status );
-      reduce_vector( m_old_ids, status );
-      reduce_vector( m_current_tracked_pts, status );
+    int after_track = m_last_tracked_pts.size();
 
-     int     after_track = m_last_tracked_pts.size();
-
-
-
-     cv::Mat mat_F;
+    // cv::Mat mat_F;
 
     //  tim.tic( "Reject_F" );
     //  unsigned int pts_before_F = m_last_tracked_pts.size();
@@ -718,44 +623,38 @@ void Rgbmap_tracker::track_img(std::shared_ptr<Image_frame> &img_pose, double di
     //  reduce_vector( m_current_tracked_pts, status );
 
     m_map_rgb_pts_in_current_frame_pos.clear();
-     double frame_time_diff = ( m_current_frame_time - m_last_frame_time );
-      for ( uint i = 0; i < m_last_tracked_pts.size(); i++ )
-          {
-        if ( img_pose->if_2d_points_available( m_current_tracked_pts[ i ].x, m_current_tracked_pts[ i ].y, 1.0, 0.05 ) )
-         {
-             RGB_pts *rgb_pts_ptr = ( ( RGB_pts * ) m_rgb_pts_ptr_vec_in_last_frame[ m_old_ids[ i ] ] );
-             m_map_rgb_pts_in_current_frame_pos[ rgb_pts_ptr ] = m_current_tracked_pts[ i ];
-             cv::Point2f pt_img_vel = ( m_current_tracked_pts[ i ] - m_last_tracked_pts[ i ] ) / frame_time_diff;
-             rgb_pts_ptr->m_img_pt_in_last_frame = vec_2( m_last_tracked_pts[ i ].x, m_last_tracked_pts[ i ].y );
-             rgb_pts_ptr->m_img_pt_in_current_frame = vec_2( m_current_tracked_pts[ i ].x, m_current_tracked_pts[ i ].y );
-             rgb_pts_ptr->m_img_vel = vec_2( pt_img_vel.x, pt_img_vel.y );
-         }
-     }
+    double frame_time_diff = (m_current_frame_time - m_last_frame_time);
+    for (uint i = 0; i < m_last_tracked_pts.size(); i++)
+    {
+        if (img_pose->if_2d_points_available(m_current_tracked_pts[i].x, m_current_tracked_pts[i].y, 1.0, 0.05))
+        {
+            RGB_pts *rgb_pts_ptr = ((RGB_pts *)m_rgb_pts_ptr_vec_in_last_frame[m_old_ids[i]]);
+            m_map_rgb_pts_in_current_frame_pos[rgb_pts_ptr] = m_current_tracked_pts[i];
+            cv::Point2f pt_img_vel = (m_current_tracked_pts[i] - m_last_tracked_pts[i]) / frame_time_diff;
+            rgb_pts_ptr->m_img_pt_in_last_frame = vec_2(m_last_tracked_pts[i].x, m_last_tracked_pts[i].y);
+            rgb_pts_ptr->m_img_pt_in_current_frame = vec_2(m_current_tracked_pts[i].x, m_current_tracked_pts[i].y);
+            rgb_pts_ptr->m_img_vel = vec_2(pt_img_vel.x, pt_img_vel.y);
+        }
+    }
 
     //  if ( dis > 0 )
     //       {
     //      reject_error_tracking_pts( img_pose, dis );
     //  }
 
-
-
     cv::cvtColor(frame_gray, m_debug_track_img, cv::COLOR_GRAY2BGR);
-     for ( uint i = 0; i < m_current_tracked_pts.size(); i++ )
-     {
-         cv::arrowedLine(m_debug_track_img, m_last_tracked_pts[i], m_current_tracked_pts[i], cv::Scalar(0,0,255),3);
-     }
+    for (uint i = 0; i < m_current_tracked_pts.size(); i++)
+    {
+        cv::arrowedLine(m_debug_track_img, m_last_tracked_pts[i], m_current_tracked_pts[i], cv::Scalar(0, 0, 255), 3);
+    }
 
-
-
-
-
-     m_old_gray = frame_gray.clone();
-     m_old_frame = m_current_frame;
+    m_old_gray = frame_gray.clone();
+    m_old_frame = m_current_frame;
     m_map_rgb_pts_in_last_frame_pos = m_map_rgb_pts_in_current_frame_pos;
     update_last_tracking_vector_and_ids();
     m_frame_idx++;
-     m_last_frame_time = m_current_frame_time;
-  }
+    m_last_frame_time = m_current_frame_time;
+}
 
 int Rgbmap_tracker::get_all_tracked_pts(std::vector<std::vector<cv::Point2f>> *img_pt_vec)
 {
@@ -776,11 +675,10 @@ int Rgbmap_tracker::get_all_tracked_pts(std::vector<std::vector<cv::Point2f>> *i
     return hit_count;
 }
 
-int Rgbmap_tracker::remove_outlier_using_ransac_pnp(cv::Mat &r_vec, cv::Mat &t_vec , std::shared_ptr<Image_frame> &img_pose, int if_remove_ourlier)
+int Rgbmap_tracker::remove_outlier_using_ransac_pnp(Eigen::Matrix3d &cam_K, cv::Mat &r_vec, cv::Mat &t_vec, std::shared_ptr<Image_frame> &img_pose, int if_remove_ourlier)
 {
     Common_tools::Timer tim;
     tim.tic();
-
 
     vec_3 eigen_r_vec, eigen_t_vec;
     std::vector<cv::Point3f> pt_3d_vec, pt_3d_vec_selected;
@@ -802,8 +700,20 @@ int Rgbmap_tracker::remove_outlier_using_ransac_pnp(cv::Mat &r_vec, cv::Mat &t_v
         std::vector<int> status;
         try
         {
-            cv::solvePnPRansac(pt_3d_vec, pt_2d_vec, m_intrinsic, cv::Mat(), r_vec, t_vec, false, 200, 1.5, 0.99,
+            cv::Mat inter;
+            cv::eigen2cv(cam_K, inter);
+            //inter = 0*inter ;
+            auto start = std::chrono::high_resolution_clock::now();
+
+            cv::solvePnPRansac(pt_3d_vec, pt_2d_vec, inter, cv::Mat(), r_vec, t_vec, false, 200, 1.5, 0.99,
                                status); // SOLVEPNP_ITERATIVE
+            auto end = std::chrono::high_resolution_clock::now();
+
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+            double diff = status.size();
+            // diff /=pt_3d_vec.size() ;
+            //std::cout << "duration" << duration << std::endl;
+            //std::cout << "points size" << pt_3d_vec.size() << std::endl;
         }
         catch (cv::Exception &e)
         {
@@ -811,20 +721,43 @@ int Rgbmap_tracker::remove_outlier_using_ransac_pnp(cv::Mat &r_vec, cv::Mat &t_v
             cout << "Catching a cv exception: " << e.msg << endl;
             return 0;
         }
+
+
+
+        //cv::Mat m_current_frame = img_pose->m_img;
+        //cv::Mat new_gray_rgb(m_current_frame.size(), CV_8UC3);
+       // cv::cvtColor(m_current_frame, new_gray_rgb, cv::COLOR_GRAY2RGB);
+        cv::Mat new_gray ; 
+        img_pose->m_img_gray.convertTo(new_gray, CV_32F);
+        cv::Mat grayscale;
+        new_gray.convertTo(grayscale, CV_8UC1);
+        cv::Mat new_gray_rgb(new_gray.size(), CV_8UC3);
+        cv::cvtColor(grayscale, new_gray_rgb, cv::COLOR_GRAY2RGB);
+
         if (if_remove_ourlier)
         {
             // Remove outlier
             m_map_rgb_pts_in_last_frame_pos.clear();
             m_map_rgb_pts_in_current_frame_pos.clear();
+            
             for (unsigned int i = 0; i < status.size(); i++)
             {
                 int inlier_idx = status[i];
                 {
                     m_map_rgb_pts_in_last_frame_pos[map_ptr_vec[inlier_idx]] = pt_2d_vec[inlier_idx];
                     m_map_rgb_pts_in_current_frame_pos[map_ptr_vec[inlier_idx]] = pt_2d_vec[inlier_idx];
+                    cv::Point2f px = pt_2d_vec[inlier_idx] ; 
+                    int row = round(px.y) ;
+                    int col = round(px.x) ; 
+                    vec_3 pt_3d = ((RGB_pts *)map_ptr_vec[inlier_idx])->get_pos(); 
+                     double depth = (pt_3d - img_pose->m_pose_w2c_t).norm();
+                     Eigen::Vector3i jet = jetColorMap2(depth / 3.0);
+                cv::Vec3b pixel(jet[2], jet[1], jet[0]);
+                    new_gray_rgb.at<cv::Vec3b>(row, col)  = pixel ; 
                 }
             }
         }
+        cv::imwrite("/app/images_reg/" + std::to_string(m_frame_idx-1) + "cut.png", new_gray_rgb);
         update_last_tracking_vector_and_ids();
     }
 
