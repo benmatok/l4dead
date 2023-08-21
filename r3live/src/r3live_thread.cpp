@@ -701,7 +701,9 @@ bool R3LIVE::VIO()
         }
         //StatesGroup state_diff = StatesGroup() + (state_out - last_image_state) ; 
         //Eigen::Matrix3d camera_rot = state_diff.rot_end ; 
-        Eigen::Matrix3d homography = g_cam_K*state_out.rot_end*last_image_state.rot_end.transpose()*g_cam_K.inverse() ; 
+        Eigen::Matrix3d R = g_lio_state.rot_end*last_image_state.rot_end.transpose() ; 
+
+        Eigen::Matrix3d homography = g_cam_K*R *g_cam_K.inverse() ; 
         
         
         StatesGroup state_prop =  state_out ; 
@@ -709,7 +711,7 @@ bool R3LIVE::VIO()
          //laser_to_camera(laserCloudFullRes2 ,img_pose,  g_lio_state , counter , lidar_time , outfile ); 
          //counter++ ; 
 
-        op_track.track_img(img_pose, -20 ,1,homography);
+        op_track.track_img(img_pose, -20 ,1, homography.inverse());
          g_cost_time_logger.record(tim, "Track_img");
         // cout << "Track_img cost " << tim.toc( "Track_img" ) << endl;
          tim.tic("Ransac");
@@ -720,11 +722,11 @@ bool R3LIVE::VIO()
         vec_3 eigen_r_vec, eigen_t_vec;
         auto start = std::chrono::high_resolution_clock::now();
 
-        if (op_track.remove_outlier_using_ransac_pnp( g_cam_K, r_vec, t_vec , img_pose   ) == 0)
-        {
+        // if (op_track.remove_outlier_using_ransac_pnp( g_cam_K, r_vec, t_vec , img_pose   ) == 0)
+        // {
 
-            cout << ANSI_COLOR_RED_BOLD << "****** Remove_outlier_using_ransac_pnp error*****" << ANSI_COLOR_RESET << endl;
-        }
+        //     cout << ANSI_COLOR_RED_BOLD << "****** Remove_outlier_using_ransac_pnp error*****" << ANSI_COLOR_RESET << endl;
+        // }
         
         auto  end = std::chrono::high_resolution_clock::now();
         double duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
@@ -772,9 +774,8 @@ bool R3LIVE::VIO()
                         
         std::ofstream outfile_mah("/app/mahalanobis_distance_vio.txt", std::ios::app);
         outfile_mah <<  std::setprecision(16) << state_out.last_update_time << " "<<mahalanobis_distance << std::endl ; 
-            outfile_mah.close() ;
-
-        if(mahalanobis_distance< 3)
+        outfile_mah.close() ;     
+        if(0)
         {
         g_lio_state = state_out;
         }
@@ -783,7 +784,7 @@ bool R3LIVE::VIO()
 
         }
         last_image_state = g_lio_state ; 
-        set_image_pose( img_pose, g_lio_state );
+        //set_image_pose( img_pose, g_lio_state );
         print_dash_board();
 
         if (1)
@@ -899,7 +900,6 @@ void R3LIVE::single_thread()
             std::cout << "start VIO " << std::endl;
             VIO() ; 
             std::cout << "end VIO " << std::endl;
-
         }
 
         }

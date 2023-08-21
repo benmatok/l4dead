@@ -48,6 +48,7 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
 #include "rgbmap_tracker.hpp"
 #include <unsupported/Eigen/Splines>
 #include "profc.h"
+#include <algorithm>
 Rgbmap_tracker::Rgbmap_tracker()
 {
     cv::TermCriteria criteria = cv::TermCriteria((cv::TermCriteria::COUNT) + (cv::TermCriteria::EPS), 10, 0.05);
@@ -386,6 +387,60 @@ Eigen::Vector3i jetColorMap2(double value)
     return Eigen::Vector3i(red, green, blue);
 }
 
+
+
+#include <iostream>
+#include <vector>
+#include <algorithm>
+#include <cmath>
+
+void indicesGreaterThanPercentile(const std::vector<float>& data, float percentile , std::vector<size_t> &indices ) {
+    
+    // Step 1: Sort the vector
+    std::vector<float> sortedData = data;
+    std::sort(sortedData.begin(), sortedData.end());
+
+    // Step 2: Calculate the value of the 10th percentile
+    float index = (percentile / 100.0f) * (sortedData.size() - 1);
+    size_t floorIndex = static_cast<size_t>(std::floor(index));
+    size_t ceilIndex = static_cast<size_t>(std::ceil(index));
+    float percentileValue = sortedData[floorIndex] + (sortedData[ceilIndex] - sortedData[floorIndex]) * (index - floorIndex);
+
+    // Step 3: Find indices of elements greater than the 10th percentile value
+    for (size_t i = 0; i < data.size(); ++i) {
+        if (data[i] > percentileValue) {
+            indices.push_back(i);
+        }
+    }
+
+}
+float findPercentile(const std::vector<float>& data, float percentile) {
+    // Make a copy of the input vector so the original data is not sorted
+    std::vector<float> sorted_data = data;
+
+    // Step 1: Sort the copy of the vector
+    std::sort(sorted_data.begin(), sorted_data.end());
+
+    // Step 2: Calculate the index corresponding to the percentile
+    float index = (percentile / 100.0f) * (sorted_data.size() - 1);
+
+    // Step 3: Handle cases where the index is not an integer
+    size_t floorIndex = static_cast<size_t>(std::floor(index));
+    size_t ceilIndex = static_cast<size_t>(std::ceil(index));
+
+    if (floorIndex == ceilIndex) {
+        // Index is an integer, so the percentile value is the element at that index
+        return sorted_data[floorIndex];
+    } else {
+        // Index is not an integer, interpolate between the floor and ceiling indices
+        float floorValue = sorted_data[floorIndex];
+        float ceilValue = sorted_data[ceilIndex];
+        float fraction = index - floorIndex;
+        return floorValue + (ceilValue - floorValue) * fraction;
+    }
+}
+
+
 void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::Point2f> &last_tracked_pts, std::vector<cv::Point2f> &curr_tracked_pts, std::vector<uchar> &status, std::shared_ptr<Image_frame> &img_pose , Eigen::Matrix3d homography)
 {
 
@@ -402,7 +457,6 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
     cv::Mat initial_deform_row(new_gray.rows , new_gray.cols , CV_32F);
     cv::Mat initial_deform_col(new_gray.rows , new_gray.cols , CV_32F);
     // Initialization with homography
-    std::cout << homography << std::endl;
     for (int i =0 ; i<new_gray.rows ; i++ )
     {
 
@@ -411,8 +465,8 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
         {
             Eigen::Vector3d pixel_1(j,i,1) ; 
             Eigen::Vector3d pixel_2 = homography *pixel_1  ; 
-            initial_deform_row.at<float>(i,j) =  pixel_2[1] - i  ; 
-            initial_deform_col.at<float>(i,j) =  pixel_2[0]  - j ; 
+            initial_deform_row.at<float>(i,j) =  pixel_2[1] - i    ; 
+            initial_deform_col.at<float>(i,j) =   pixel_2[0] - j   ; 
 
 
 
@@ -430,8 +484,8 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
 
     cv::Mat deform_row; // = cv::Mat::zeros(new_gray.rows, new_gray.cols, CV_32F) ;
     cv::Mat deform_col; //= cv::Mat::zeros(new_gray.rows, new_gray.cols, CV_32F) ;
-    cv::Mat deform_row_before;
-    cv::Mat deform_col_before;
+    cv::Mat deform_row_before = cv::Mat::zeros(new_gray.rows / scales[0], new_gray.cols / scales[0], CV_32F); ;
+    cv::Mat deform_col_before = cv::Mat::zeros(new_gray.rows / scales[0], new_gray.cols / scales[0], CV_32F);;
       cv::Size new_size = cv::Size(new_gray.cols / 10, new_gray.rows / 10);
     cv::resize(initial_deform_row, deform_row_before, new_size, cv::INTER_LINEAR);
     cv::resize(initial_deform_col, deform_col_before, new_size, cv::INTER_LINEAR);
@@ -452,7 +506,7 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
        // else
        // {
 
-            demon_scale(old_gray, new_gray, curr_deform_row, curr_deform_col, scales[i], iter[i], kernel_size[i], deform_row_before, deform_col_before);
+        demon_scale(old_gray, new_gray, curr_deform_row, curr_deform_col, scales[i], iter[i], kernel_size[i], deform_row_before, deform_col_before);
         //}
         curr_deform_row.copyTo(deform_row_before);
         curr_deform_col.copyTo(deform_col_before);
@@ -556,28 +610,103 @@ void Rgbmap_tracker::demon_track_image(cv::Mat &curr_img, const std::vector<cv::
     // auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
     // std::cout << "Execution time: " << duration << " milliseconds" << std::endl;
 
-    // cv::Mat after_solution(new_gray.rows, new_gray.cols, CV_32F) ;  //(new_gray.rows, new_gray.cols, CV_32F, cv::Scalar(0));
-    // for (int i = 0; i < after_solution.rows; i++)
-    //  {
-    //      for (int j = 0; j < after_solution.cols; j++)
-    //     {
 
-    //         //float  new_gray_value  =  get_interpulation_value(old_gray , i ,  j ,   7 , i +  deform_row.at<float>(i,j) ,j +  deform_col.at<float>(i,j)   )  ;
-    //         int new_row = round(i - deform_row.at<float>(i,j)) ;
-    //         int new_col =  round(j  - deform_col.at<float>(i,j)) ;
-    //          if(new_row > new_gray_rgb.rows - 1 || new_row < 0 || new_col < 0 || new_col > new_gray_rgb.cols -1   )
-    //         {
-    //             continue ;
-    //         }
-    //         after_solution.at<float>(new_row,new_col ) = old_gray.at<float>(i,j) ;
-    //     }
 
-    //  }
 
-    //  cv::imwrite("/app/images/" + std::to_string(m_frame_idx) + "before_reg.png" ,255*old_gray ) ;
-    //  cv::imwrite("/app/images/" + std::to_string(m_frame_idx) + "after_reg.png" ,255*after_solution ) ;
-    //  cv::imwrite("/app/images/" + std::to_string(m_frame_idx) +"to_reg.png" ,255*new_gray ) ;
+    cv::Mat x_kernel = (cv::Mat_<float>(1, 3) << -0.5f, 0.0f, 0.5f);
+    cv::Mat grad_x_old;
+    cv::filter2D(new_gray, grad_x_old, -1, x_kernel);
+    cv::Mat grad_y_old;
+    cv::filter2D(new_gray, grad_y_old, -1, x_kernel.t());
+
+     cv::Mat magnitude, direction;
+    cv::cartToPolar(grad_x_old, grad_y_old, magnitude, direction);
+
+
+    cv::Mat after_solution(new_gray.rows, new_gray.cols, CV_32F) ;  //(new_gray.rows, new_gray.cols, CV_32F, cv::Scalar(0));
+    std::vector<int> all_rows ; 
+    std::vector<int> all_cols ;
+    std::vector<float>   diff_flat ;  
+    std::vector<float>   magnitude_flat ;  
+    for (int i = 0; i < after_solution.rows; i++)
+     {
+         for (int j = 0; j < after_solution.cols; j++)
+        {
+
+            float  new_gray_value  =  get_interpulation_value(old_gray , i ,  j ,   7 , i +  deform_row.at<float>(i,j) ,j + deform_col.at<float>(i,j)   )  ;
+            // int new_row = round(i - initial_deform_row.at<float>(i,j)) ;
+            // int new_col =  round(j  - initial_deform_col.at<float>(i,j)) ;
+            //  if(new_row > new_gray_rgb.rows - 1 || new_row < 0 || new_col < 0 || new_col > new_gray_rgb.cols -1   )
+            // {
+            //     continue ;
+            // }
+            after_solution.at<float>(i,j ) = new_gray_value ;
+            all_rows.push_back(i) ;
+            all_cols.push_back(j) ;
+            float new_diff = 1 - std::abs(new_gray_value - new_gray.at<float>(i,j) ) ; 
+            diff_flat.push_back(new_diff) ; 
+            magnitude_flat.push_back(magnitude.at<float>(i,j)) ; 
+            
+            
+        }
+
+     }
+     std::vector<size_t> indcies_grad ;
+    std::vector<size_t> indcies_diff ; 
+     std::vector<float> values_diff ;
+     double diff_size = indcies_grad.size() ;
+     diff_size /=magnitude_flat.size() ; 
+
+      indicesGreaterThanPercentile(magnitude_flat, 90  ,indcies_grad  ) ; 
+      indicesGreaterThanPercentile(diff_flat, 0    ,indcies_diff  ) ; 
+      std::sort(indcies_grad.begin() , indcies_grad.end() ) ; 
+      std::sort(indcies_diff.begin() , indcies_diff.end() ) ; 
+      std::vector<size_t> indcies_inter ;
+      std::cout << indcies_diff.size()<< std::endl;
+      std::set_intersection(indcies_grad.begin() , indcies_grad.end() ,indcies_diff.begin() , indcies_diff.end() , std::back_inserter(indcies_inter) );
+      
+
+    cv::Mat good_pixels = cv::Mat::zeros(after_solution.rows, after_solution.cols, CV_32F);
+    std::cout << "hello000000000000000000000" << std::endl;
+      for(int i = 0 ;i<indcies_inter.size() ; i++)
+      {
+
+            int flat_index= indcies_inter[i] ; 
+            int col = all_cols[flat_index] ; 
+            int row = all_rows[flat_index] ; 
+            good_pixels.at<float>(row, col) = 255  ; 
+
+      }
+
+      for(int i = 0 ; i<last_tracked_pts.size() ; i ++)
+      {
+        int row = round(last_tracked_pts[i].y) ; 
+        int col = round(last_tracked_pts[i].x) ; 
+        if(good_pixels.at<float>(row, col) < 0.1)
+        {
+            status[i] = 0 ; 
+        }
+        
+
+      }
+
+    cv::Mat similiar = cv::abs(after_solution - new_gray);
+    cv::Mat plus = (magnitude*0 +1)-magnitude ; 
+    plus = plus - similiar  ;
+    cv::Mat exp_plus;
+    cv::exp(-1*plus , exp_plus) ;
+
+
+
+     cv::imwrite("/app/images/" + std::to_string(m_frame_idx) + "before_reg.png" ,255*old_gray ) ;
+     cv::imwrite("/app/images/" + std::to_string(m_frame_idx) + "after_reg.png" ,255*after_solution ) ;
+     cv::imwrite("/app/images/" + std::to_string(m_frame_idx) +"to_reg.png" ,255*new_gray ) ;
+     cv::imwrite("/app/images/" + std::to_string(m_frame_idx) +"exp.png" ,200*exp_plus ) ;
+     cv::imwrite("/app/images/" + std::to_string(m_frame_idx) +"diff.png" ,10*255*similiar ) ;
+     cv::imwrite("/app/images/" + std::to_string(m_frame_idx) +"magnitude.png" ,10*255*magnitude ) ;
+     cv::imwrite("/app/images/" + std::to_string(m_frame_idx) +"good_pixels.png" ,good_pixels ) ;
 }
+
 
 void Rgbmap_tracker::track_img(std::shared_ptr<Image_frame> &img_pose, double dis, int if_use_opencv,Eigen::Matrix3d homography )
 {
@@ -612,15 +741,15 @@ void Rgbmap_tracker::track_img(std::shared_ptr<Image_frame> &img_pose, double di
 
     int after_track = m_last_tracked_pts.size();
 
-    // cv::Mat mat_F;
+    cv::Mat mat_F;
 
-    //  tim.tic( "Reject_F" );
-    //  unsigned int pts_before_F = m_last_tracked_pts.size();
-    //  mat_F = cv::findFundamentalMat( m_last_tracked_pts, m_current_tracked_pts, cv::FM_RANSAC, 1.0, 0.997, status );
-    //  unsigned int size_a = m_current_tracked_pts.size();
-    //  reduce_vector( m_last_tracked_pts, status );
-    //  reduce_vector( m_old_ids, status );
-    //  reduce_vector( m_current_tracked_pts, status );
+     tim.tic( "Reject_F" );
+     unsigned int pts_before_F = m_last_tracked_pts.size();
+     mat_F = cv::findFundamentalMat( m_last_tracked_pts, m_current_tracked_pts, cv::FM_RANSAC, 3.0, 0.997, status );
+     unsigned int size_a = m_current_tracked_pts.size();
+     reduce_vector( m_last_tracked_pts, status );
+     reduce_vector( m_old_ids, status );
+     reduce_vector( m_current_tracked_pts, status );
 
     m_map_rgb_pts_in_current_frame_pos.clear();
     double frame_time_diff = (m_current_frame_time - m_last_frame_time);
@@ -705,7 +834,7 @@ int Rgbmap_tracker::remove_outlier_using_ransac_pnp(Eigen::Matrix3d &cam_K, cv::
             //inter = 0*inter ;
             auto start = std::chrono::high_resolution_clock::now();
 
-            cv::solvePnPRansac(pt_3d_vec, pt_2d_vec, inter, cv::Mat(), r_vec, t_vec, false, 200, 1.5, 0.99,
+            cv::solvePnPRansac(pt_3d_vec, pt_2d_vec, inter, cv::Mat(), r_vec, t_vec, false, 200, 3, 0.99,
                                status); // SOLVEPNP_ITERATIVE
             auto end = std::chrono::high_resolution_clock::now();
 
